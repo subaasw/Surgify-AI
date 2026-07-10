@@ -1,10 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
+import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
+import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { useSimulation } from "./SimulationProvider";
-import { MedicalFBX, ModelErrorBoundary, SafeMedicalGLB } from "./ModelRegistry";
+import { ModelErrorBoundary, SafeMedicalGLB } from "./ModelRegistry";
 import { MODEL_PATHS } from "@/data/modelConfig";
 import { WORKSPACE, angleTarget, handTarget, springStep } from "@/lib/handPhysics.mjs";
 
@@ -27,16 +29,20 @@ const STALE_MS = 1200; // no detection for this long → hand parks by the tray
 
 // Calibration knobs for the FBX asset (unknown authored axes/origin).
 const HAND_MODEL_ROTATION: [number, number, number] = [-Math.PI / 2, 0, Math.PI];
-const HAND_MODEL_SIZE = 1.2;
+const HAND_MODEL_SIZE = 1.7;
 const PARK = { x: 2.4, y: 2.4, z: 1.4 };
+
+type TrackingPhase = "starting" | "denied" | "offline" | "active";
 
 /**
  * DOM side of gesture control: streams webcam frames to the backend MediaPipe
- * endpoint and publishes the first detected hand into `handStore`. Render it
- * outside the r3f Canvas.
+ * endpoint, publishes the first detected hand into `handStore`, and shows a
+ * small picture-in-picture camera panel. Render it outside the r3f Canvas.
  */
 export function HandTrackingDriver() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [phase, setPhase] = useState<TrackingPhase>("starting");
+  const [gesture, setGesture] = useState("No hand");
   const { state, releaseTool } = useSimulation();
   const simRef = useRef({ selectedTool: state.selectedTool, releaseTool });
   useEffect(() => { simRef.current = { selectedTool: state.selectedTool, releaseTool }; }, [state.selectedTool, releaseTool]);
@@ -64,15 +70,17 @@ export function HandTrackingDriver() {
         form.append("mode", "mediapipe");
         form.append("timestamp_ms", String(Date.now()));
         const response = await fetch(`${API_URL}/vision/frame`, { method: "POST", body: form });
-        if (!response.ok || stopped) return;
+        if (!response.ok || stopped) { setPhase("offline"); return; }
         const result = await response.json() as { hands?: TrackedHand[] };
         const hand = result.hands?.[0] ?? null;
         handStore.hand = hand;
         handStore.at = performance.now();
+        setPhase("active");
+        setGesture(hand ? (hand.pinch ? "Pinch" : hand.gesture?.replace(/_/g, " ") || "Tracking") : "No hand");
         openFrames = hand && hand.gesture === "Open_Palm" && !hand.pinch ? openFrames + 1 : 0;
         if (openFrames === RELEASE_FRAMES && simRef.current.selectedTool) simRef.current.releaseTool();
       } catch {
-        // backend offline — the hand simply parks; WebcamPractice surfaces vision errors
+        if (!stopped) setPhase("offline");
       } finally {
         inFlight = false;
       }
@@ -89,7 +97,7 @@ export function HandTrackingDriver() {
         await videoRef.current.play();
         timer = window.setInterval(tick, FRAME_INTERVAL_MS);
       } catch {
-        // camera denied — nothing to drive
+        if (!stopped) setPhase("denied");
       }
     })();
 
@@ -101,7 +109,11 @@ export function HandTrackingDriver() {
     };
   }, []);
 
-  return <video ref={videoRef} muted playsInline style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }} />;
+  const label = phase === "starting" ? "Starting camera…" : phase === "denied" ? "Camera blocked" : phase === "offline" ? "Vision offline — start backend :8000" : "Hand tracking";
+  return <div className={`gesture-pip${phase === "active" ? "" : " offline"}`}>
+    <video ref={videoRef} muted playsInline />
+    <div><i /><span>{label}</span>{phase === "active" && <strong>{gesture}</strong>}</div>
+  </div>;
 }
 
 const TOOL_ASSETS: Record<string, string> = {
@@ -150,13 +162,44 @@ export function GestureHand() {
   return <group ref={root} position={[PARK.x, PARK.y, PARK.z]}>
     <ModelErrorBoundary fallback={<FallbackHand />}>
       <Suspense fallback={<FallbackHand />}>
-        <group rotation={HAND_MODEL_ROTATION}><MedicalFBX path={MODEL_PATHS.handArm} targetSize={HAND_MODEL_SIZE} preserveTextures /></group>
+        <group rotation={HAND_MODEL_ROTATION}><HandModel /></group>
       </Suspense>
     </ModelErrorBoundary>
     <group ref={toolRef} visible={false} position={[0, -.26, .1]} rotation={[Math.PI / 2, 0, 0]}>
       {toolPath && <SafeMedicalGLB path={toolPath} targetSize={.6} color="#bcc8cc" metalness={.84} roughness={.2} preserveTextures={false} fallback={<group />} />}
     </group>
   </group>;
+}
+
+/**
+ * The arm FBX is a skinned rig, so a plain `.clone(true)` (what MedicalFBX
+ * does) leaves the copy bound to the source skeleton and it renders collapsed
+ * at the origin. SkeletonUtils.clone rebinds bones so the rig follows this
+ * component's transform.
+ */
+function HandModel() {
+  const source = useLoader(FBXLoader, MODEL_PATHS.handArm);
+  const model = useMemo(() => {
+    const rig = cloneSkeleton(source);
+    rig.traverse(object => {
+      if (!(object instanceof THREE.Mesh)) return;
+      object.castShadow = true;
+      object.frustumCulled = false; // skinned bounds don't follow the moving root
+      // the FBX references external texture files that ship separately — without
+      // them the authored materials render black, so use a surgical-glove material
+      const glove = new THREE.MeshStandardMaterial({ color: "#9fc6d8", roughness: .5, metalness: .05 });
+      object.material = Array.isArray(object.material) ? object.material.map(() => glove) : glove;
+    });
+    rig.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(rig);
+    const size = box.getSize(new THREE.Vector3());
+    const scale = HAND_MODEL_SIZE / (Math.max(size.x, size.y, size.z) || 1);
+    const center = box.getCenter(new THREE.Vector3());
+    rig.scale.multiplyScalar(scale);
+    rig.position.copy(center).multiplyScalar(-scale);
+    return rig;
+  }, [source]);
+  return <primitive object={model} />;
 }
 
 function FallbackHand() {
