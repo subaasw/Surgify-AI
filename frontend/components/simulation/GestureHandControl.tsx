@@ -1,14 +1,14 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useFrame, useLoader } from "@react-three/fiber";
+import { createPortal, useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { useSimulation } from "./SimulationProvider";
 import { ModelErrorBoundary, SafeMedicalGLB } from "./ModelRegistry";
 import { MODEL_PATHS } from "@/data/modelConfig";
-import { WORKSPACE, angleTarget, handTarget, springStep } from "@/lib/handPhysics.mjs";
+import { WORKSPACE, damp, fingerCurls, palmPose, springStep } from "@/lib/handPhysics.mjs";
 
 type Landmark = { x: number; y: number; z: number };
 export type TrackedHand = {
@@ -27,9 +27,11 @@ const FRAME_INTERVAL_MS = 180;
 const RELEASE_FRAMES = 4; // sustained open palms before the tool returns to the tray
 const STALE_MS = 1200; // no detection for this long → hand parks by the tray
 
-// Calibration knobs for the FBX asset (unknown authored axes/origin).
-const HAND_MODEL_ROTATION: [number, number, number] = [-Math.PI / 2, 0, Math.PI];
-const HAND_MODEL_SIZE = 1.7;
+// Calibration knobs for the rigged arms asset.
+const HAND_LENGTH = .56; // wrist → middle fingertip, world units
+const ARM_SHORTEN = { upper: .35, fore: .55 }; // compress the arm trailing behind the wrist
+const CURL_PER_JOINT = [.8, 1.05, .65]; // radians per knuckle at full curl
+const FLIP_HANDEDNESS = false; // flip if the on-screen hand mirrors your real one
 const PARK = { x: 2.4, y: 2.4, z: 1.4 };
 
 type TrackingPhase = "starting" | "denied" | "offline" | "active";
@@ -123,89 +125,175 @@ const TOOL_ASSETS: Record<string, string> = {
   "Curved needle": MODEL_PATHS.curvedNeedle,
 };
 
-/**
- * 3D side: the surgeon hand model, spring-damper driven toward the latest
- * detection so motion has inertia, clamped against the patient plane.
- * Pinching picks up the selected instrument; it hides again on release.
- */
+type Side = "Left" | "Right";
+const SIDES: Side[] = ["Left", "Right"];
+const FINGERS = ["Thumb", "Index", "Middle", "Ring", "Pinky"] as const;
+type FingerName = "thumb" | "index" | "middle" | "ring" | "pinky";
+
+type Joint = { bone: THREE.Object3D; rest: THREE.Quaternion; axis: THREE.Vector3 };
+type SideRig = {
+  armRoot: THREE.Object3D | null;
+  armBaseScale: number;
+  wrist: THREE.Object3D;
+  pivot: THREE.Vector3; // rig offset that puts this wrist at the group origin
+  restQuatInv: THREE.Quaternion;
+  fingers: Record<FingerName, Joint[]>;
+};
+
+const vecOf = (root: THREE.Object3D, name: string) => {
+  const bone = root.getObjectByName(name);
+  return bone ? bone.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3();
+};
+
+const basisQuat = (across: THREE.Vector3, up: THREE.Vector3, forward: THREE.Vector3) =>
+  new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(across, up, forward));
+
+/** Wraps the rigged hand in error/suspense boundaries so a bad asset degrades gracefully. */
 export function GestureHand() {
+  return <ModelErrorBoundary fallback={<group />}>
+    <Suspense fallback={<group />}>
+      <RiggedHand />
+    </Suspense>
+  </ModelErrorBoundary>;
+}
+
+/**
+ * The surgeon hand: MediaPipe landmarks drive the FBX skeleton directly.
+ * Palm orientation comes from the landmark basis (so showing the back of the
+ * hand or the palm reads correctly), each finger curls from its own landmark
+ * angles, the arm matching the detected handedness is shown, and position is
+ * spring-damped with a collision floor above the patient.
+ */
+function RiggedHand() {
+  const source = useLoader(FBXLoader, MODEL_PATHS.handArm);
   const root = useRef<THREE.Group>(null);
-  const toolRef = useRef<THREE.Group>(null);
+  const rot = useRef<THREE.Group>(null);
+  const [side, setSide] = useState<Side>("Right");
   const axes = useRef({
     x: { value: PARK.x, velocity: 0 },
     y: { value: PARK.y, velocity: 0 },
     z: { value: PARK.z, velocity: 0 },
-    yaw: { value: 0, velocity: 0 },
-    roll: { value: 0, velocity: 0 },
     grip: { value: 0, velocity: 0 },
   });
+  const curls = useRef<Record<FingerName, number>>({ thumb: .15, index: .15, middle: .15, ring: .15, pinky: .15 });
   const { state } = useSimulation();
   const toolPath = state.selectedTool ? TOOL_ASSETS[state.selectedTool] : undefined;
 
-  useFrame((_, delta) => {
-    const group = root.current;
-    if (!group) return;
-    const live = handStore.hand && performance.now() - handStore.at < STALE_MS ? handStore.hand : null;
-    const target = live ? handTarget(live) : { ...PARK, yaw: 0, roll: 0, grip: 0 };
-    const a = axes.current;
-    springStep(a.x, target.x, delta);
-    springStep(a.y, target.y, delta);
-    springStep(a.z, target.z, delta);
-    springStep(a.yaw, angleTarget(a.yaw.value, target.yaw), delta);
-    springStep(a.roll, angleTarget(a.roll.value, target.roll), delta);
-    springStep(a.grip, target.grip, delta, 40, 12);
-    group.position.set(a.x.value, Math.max(a.y.value, WORKSPACE.floorY), a.z.value);
-    group.rotation.set(0, a.yaw.value, a.roll.value * .5);
-    if (toolRef.current) toolRef.current.visible = a.grip.value > .5;
-  });
-
-  return <group ref={root} position={[PARK.x, PARK.y, PARK.z]}>
-    <ModelErrorBoundary fallback={<FallbackHand />}>
-      <Suspense fallback={<FallbackHand />}>
-        <group rotation={HAND_MODEL_ROTATION}><HandModel /></group>
-      </Suspense>
-    </ModelErrorBoundary>
-    <group ref={toolRef} visible={false} position={[0, -.26, .1]} rotation={[Math.PI / 2, 0, 0]}>
-      {toolPath && <SafeMedicalGLB path={toolPath} targetSize={.6} color="#bcc8cc" metalness={.84} roughness={.2} preserveTextures={false} fallback={<group />} />}
-    </group>
-  </group>;
-}
-
-/**
- * The arm FBX is a skinned rig, so a plain `.clone(true)` (what MedicalFBX
- * does) leaves the copy bound to the source skeleton and it renders collapsed
- * at the origin. SkeletonUtils.clone rebinds bones so the rig follows this
- * component's transform.
- */
-function HandModel() {
-  const source = useLoader(FBXLoader, MODEL_PATHS.handArm);
-  const model = useMemo(() => {
+  const { rig, sides } = useMemo(() => {
     const rig = cloneSkeleton(source);
+    const glove = new THREE.MeshStandardMaterial({ color: "#9fc6d8", roughness: .5, metalness: .05 });
     rig.traverse(object => {
       if (!(object instanceof THREE.Mesh)) return;
       object.castShadow = true;
       object.frustumCulled = false; // skinned bounds don't follow the moving root
-      // the FBX references external texture files that ship separately — without
-      // them the authored materials render black, so use a surgical-glove material
-      const glove = new THREE.MeshStandardMaterial({ color: "#9fc6d8", roughness: .5, metalness: .05 });
       object.material = Array.isArray(object.material) ? object.material.map(() => glove) : glove;
     });
+    for (const s of SIDES) {
+      // compress the arm trailing behind the wrist, keeping the hand full size
+      rig.getObjectByName(`${s}Arm`)?.scale.setScalar(ARM_SHORTEN.upper);
+      rig.getObjectByName(`${s}ForeArm_`)?.scale.setScalar(ARM_SHORTEN.fore);
+      rig.getObjectByName(`${s}Hand`)?.scale.setScalar(1 / (ARM_SHORTEN.upper * ARM_SHORTEN.fore));
+    }
     rig.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(rig);
-    const size = box.getSize(new THREE.Vector3());
-    const scale = HAND_MODEL_SIZE / (Math.max(size.x, size.y, size.z) || 1);
-    const center = box.getCenter(new THREE.Vector3());
-    rig.scale.multiplyScalar(scale);
-    rig.position.copy(center).multiplyScalar(-scale);
-    return rig;
+    const handSpan = vecOf(rig, "LeftHand").distanceTo(vecOf(rig, "LeftHandMiddle4")) || 1;
+    rig.scale.setScalar(HAND_LENGTH / handSpan);
+    rig.updateMatrixWorld(true);
+
+    const sides = {} as Record<Side, SideRig>;
+    for (const s of SIDES) {
+      const wrist = rig.getObjectByName(`${s}Hand`);
+      // collapse from the shoulder so no orphaned shoulder chunk floats around
+      const armRoot = rig.getObjectByName(`${s}Shoulder`) ?? rig.getObjectByName(`${s}Arm`) ?? null;
+      if (!wrist) continue;
+      const wristAt = wrist.getWorldPosition(new THREE.Vector3());
+      // anatomical rest basis of this hand, from its own knuckle bones
+      const forward = vecOf(rig, `${s}HandMiddle1`).sub(wristAt).normalize();
+      const up = new THREE.Vector3().crossVectors(forward, vecOf(rig, `${s}HandIndex1`).sub(vecOf(rig, `${s}HandPinky1`)).normalize()).normalize();
+      const across = new THREE.Vector3().crossVectors(up, forward).normalize();
+      const fingers = {} as Record<FingerName, Joint[]>;
+      for (const finger of FINGERS) {
+        const joints: Joint[] = [];
+        for (let j = 1; j <= 3; j++) {
+          const bone = rig.getObjectByName(`${s}Hand${finger}${j}`);
+          if (!bone) continue;
+          const worldQuat = bone.getWorldQuaternion(new THREE.Quaternion());
+          joints.push({ bone, rest: bone.quaternion.clone(), axis: across.clone().applyQuaternion(worldQuat.invert()).normalize() });
+        }
+        fingers[finger.toLowerCase() as FingerName] = joints;
+      }
+      sides[s] = {
+        wrist,
+        armRoot,
+        armBaseScale: armRoot?.scale.x ?? 1,
+        pivot: wristAt.negate(),
+        restQuatInv: basisQuat(across, up, forward).invert(),
+        fingers,
+      };
+    }
+    return { rig, sides };
   }, [source]);
-  return <primitive object={model} />;
+
+  useFrame((_, delta) => {
+    const group = root.current;
+    const rotGroup = rot.current;
+    if (!group || !rotGroup) return;
+    const live = handStore.hand && performance.now() - handStore.at < STALE_MS ? handStore.hand : null;
+
+    const detected: Side = (live?.handedness === "Left") !== FLIP_HANDEDNESS ? "Left" : "Right";
+    const activeSide = live ? detected : side;
+    if (live && detected !== side) setSide(detected);
+    const rigSide = sides[activeSide] ?? sides.Right;
+    if (!rigSide) return;
+    for (const s of SIDES) sides[s]?.armRoot?.scale.setScalar(s === activeSide ? sides[s].armBaseScale : .0001);
+    rig.position.copy(rigSide.pivot);
+
+    const pose = live ? palmPose(live) : { ...PARK, grip: 0, axes: null };
+    const a = axes.current;
+    springStep(a.x, pose.x, delta);
+    springStep(a.y, pose.y, delta);
+    springStep(a.z, pose.z, delta);
+    springStep(a.grip, pose.grip, delta, 40, 12);
+    group.position.set(a.x.value, Math.max(a.y.value, WORKSPACE.floorY), a.z.value);
+
+    if (pose.axes) {
+      const target = basisQuat(
+        new THREE.Vector3(...pose.axes.across),
+        new THREE.Vector3(...pose.axes.up),
+        new THREE.Vector3(...pose.axes.forward),
+      ).multiply(rigSide.restQuatInv);
+      rotGroup.quaternion.slerp(target, damp(14, delta));
+    }
+
+    const liveCurls = (live ? fingerCurls(live.landmarks) : { thumb: .15, index: .15, middle: .15, ring: .15, pinky: .15 }) as Record<FingerName, number>;
+    const blend = damp(16, delta);
+    for (const finger of Object.keys(curls.current) as FingerName[]) {
+      const level = curls.current[finger] += (liveCurls[finger] - curls.current[finger]) * blend;
+      for (let j = 0; j < 3; j++) {
+        const joint = rigSide.fingers[finger]?.[j];
+        if (joint) joint.bone.quaternion.copy(joint.rest).multiply(new THREE.Quaternion().setFromAxisAngle(joint.axis, level * CURL_PER_JOINT[j]));
+      }
+    }
+  });
+
+  const wrist = sides[side]?.wrist;
+  return <group ref={root} position={[PARK.x, PARK.y, PARK.z]}>
+    <group ref={rot}>
+      <primitive object={rig} />
+    </group>
+    {toolPath && wrist && createPortal(
+      <GrippedTool path={toolPath} axesRef={axes} />,
+      wrist,
+    )}
+  </group>;
 }
 
-function FallbackHand() {
-  return <group>
-    <mesh castShadow><boxGeometry args={[.32, .09, .38]} /><meshStandardMaterial color="#7fb2c9" roughness={.6} /></mesh>
-    {[-.11, -.04, .04, .11].map(x => <mesh key={x} castShadow position={[x, 0, .29]}><boxGeometry args={[.055, .07, .22]} /><meshStandardMaterial color="#7fb2c9" roughness={.6} /></mesh>)}
-    <mesh castShadow position={[.2, 0, .05]} rotation={[0, .5, 0]}><boxGeometry args={[.06, .07, .18]} /><meshStandardMaterial color="#7fb2c9" roughness={.6} /></mesh>
+type AxesRef = React.RefObject<{ grip: { value: number } }>;
+
+/** Instrument held in the palm — visible only while the hand pinches. */
+function GrippedTool({ path, axesRef }: { path: string; axesRef: AxesRef }) {
+  const holder = useRef<THREE.Group>(null);
+  useFrame(() => { if (holder.current) holder.current.visible = (axesRef.current?.grip.value ?? 0) > .5; });
+  return <group ref={holder} visible={false}>
+    <SafeMedicalGLB path={path} targetSize={22} color="#bcc8cc" metalness={.84} roughness={.2} preserveTextures={false} position={[0, 0, 6]} rotation={[Math.PI / 2, 0, 0]} fallback={<group />} />
   </group>;
 }
