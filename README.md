@@ -13,14 +13,13 @@ Open the local URL shown in the terminal (normally `http://localhost:3000`).
 
 ## Routes
 
-- `/` — investor-style landing page
-- `/dashboard` — training overview and recommendations
-- `/training` and `/scenarios` — filterable scenario library
-- `/training/suture` — simulated live suture training session
-- `/anatomy` — interactive procedural 3D anatomy and instrument lab
-- `/results` — score breakdown, trajectory replay, and AI feedback
-- `/progress` — eight-week analytics, activity, levels, and achievements
-- `/settings` — local prototype preferences and data reset
+- `/` — immediately redirects into the simulation
+- `/simulation` — immersive virtual patient room and guided wound-closure scenario
+- `/scenarios` — clinical simulation launcher
+- `/anatomy` — full-screen interactive anatomy lab
+- `/instruments` — full-screen 3D instrument training environment
+- `/results` — scenario-specific performance review
+- `/settings` — local simulation preferences and data reset
 
 ## Stack
 
@@ -28,9 +27,10 @@ Next.js App Router, TypeScript, Tailwind CSS, React Three Fiber, Drei, Recharts,
 
 ## Prototype integration points
 
-- `components/training/WebcamSimulation.tsx` contains the demo feed and optional live camera surface. Real hand/tool tracking can replace the simulated overlay there.
-- `components/training/TrainingSession.tsx` orchestrates the state for a future inference stream and session API.
-- `data/modelConfig.ts` is the central registry for future freely licensed GLB/GLTF assets; procedural models remain the reliable offline fallback.
+- `components/simulation/WebcamPractice.tsx` contains the optional live camera surface. Real hand/tool tracking can replace the simulated overlay there.
+- `components/simulation/SimulationProvider.tsx` owns the rule-based scenario, checklist, scoring, and coach state.
+- `components/simulation/HospitalScene.tsx` builds the complete room, patient, equipment, wound patch, and guided instrument scene procedurally.
+- `data/modelConfig.ts` is the central registry for future freely licensed GLB/GLTF assets; named procedural fallbacks remain the reliable offline default.
 - `data/mockData.ts` contains the local scenario, session, anatomy, and analytics datasets.
 
 All session, score, streak, and preference persistence in this prototype is device-local via `localStorage`.

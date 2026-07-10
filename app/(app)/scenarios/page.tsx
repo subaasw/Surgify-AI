@@ -1,7 +1,10 @@
-import { DashboardHeader } from "@/components/layout/DashboardHeader";
-import { ScenarioLibrary } from "@/components/training/ScenarioLibrary";
-import "../training/training.css";
+"use client";
 
-export default function ScenariosPage() {
-  return <div className="page-wrap training-library-page"><DashboardHeader title="Scenario library" description="Explore exercises by difficulty, skills focus, duration, and completion status." /><ScenarioLibrary /></div>;
-}
+import Link from "next/link";
+import { Activity, ArrowRight, CheckCircle2, Clock3, Crosshair, Filter, Play, Search, Target } from "lucide-react";
+import { useState } from "react";
+import { scenarioTiles } from "@/data/simulationData";
+import { Badge } from "@/components/ui/Badge";
+import "./scenarios.css";
+
+export default function ScenariosPage(){const [filter,setFilter]=useState("All");const shown=scenarioTiles.filter(item=>filter==="All"||item.difficulty===filter);return <div className="app-page scenario-launcher"><header className="app-page-header"><div><h1>Scenario launcher</h1><p>Select a case to enter the simulation environment immediately.</p></div><div className="app-page-header-actions"><label className="scenario-app-search"><Search size={13}/><input placeholder="Search scenarios"/></label><button><Filter size={13}/>Filter</button></div></header><div className="app-page-content"><div className="launcher-toolbar"><div><span>Clinical simulation library</span><strong>4 available scenarios</strong></div><div>{["All","Beginner","Intermediate"].map(item=><button key={item} className={filter===item?"active":""} onClick={()=>setFilter(item)}>{item}</button>)}</div></div><div className="launcher-grid">{shown.map((scenario,index)=><article className="launcher-tile" key={scenario.id}><div className={`launcher-scene scene-${index+1}`}><span className="launcher-index">0{index+1}</span><div className="launcher-patient"><i/><b/><em/></div><div className="launcher-room"><i/><b/><em/></div><span className="tile-status"><i/>{scenario.status}</span></div><div className="launcher-copy"><div className="launcher-meta"><Badge tone={scenario.difficulty==="Beginner"?"green":"amber"}>{scenario.difficulty}</Badge><span><Clock3 size={11}/>{scenario.duration} min</span></div><h2>{scenario.name}</h2><p>{scenario.condition}</p><div className="launcher-skills"><span><Target size={11}/>Skills trained</span><div>{scenario.skills.map(skill=><small key={skill}>{skill}</small>)}</div></div><div className="launcher-progress"><div><span>Completion</span><strong>{scenario.progress}%</strong></div><i><b style={{width:`${scenario.progress}%`}}/></i></div><Link href="/simulation" className="launch-scenario">{scenario.id==="forearm"?<Play size={13} fill="currentColor"/>:<Activity size={13}/>} {scenario.id==="forearm"?"Enter simulation":"Launch training"}<ArrowRight size={13}/></Link></div></article>)}</div><div className="launcher-note"><Crosshair size={14}/><p><strong>MVP scenario:</strong> Forearm Laceration includes the complete patient assessment, preparation, guided suturing, and feedback workflow.</p><CheckCircle2 size={14}/></div></div></div>}

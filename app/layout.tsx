@@ -26,14 +26,14 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     metadataBase,
     title: { default: "Surgify AI — Surgical skills training", template: "%s · Surgify AI" },
-    description: "Webcam-powered, accessible surgical skills training for deliberate practice.",
+    description: "An immersive virtual patient environment for simulated clinical and surgical skills training.",
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
     openGraph: {
       title: "Surgify AI",
-      description: "Practice smarter. Improve every movement.",
-      images: [{ url: new URL("/og.png", metadataBase).toString(), width: 1200, height: 630, alt: "Surgify AI webcam-based surgical skills training" }],
+      description: "Enter an immersive virtual patient simulation for guided wound-closure training.",
+      images: [{ url: new URL("/og-simulation.png", metadataBase).toString(), width: 1200, height: 630, alt: "Surgify AI virtual patient simulation" }],
     },
-    twitter: { card: "summary_large_image", title: "Surgify AI", description: "Practice smarter. Improve every movement.", images: [new URL("/og.png", metadataBase).toString()] },
+    twitter: { card: "summary_large_image", title: "Surgify AI", description: "Immersive virtual patient training.", images: [new URL("/og-simulation.png", metadataBase).toString()] },
   };
 }
 
