@@ -1,0 +1,270 @@
+{
+  "id": "scenario_forearm_laceration",
+  "slug": "forearm-laceration",
+  "name": "Forearm Laceration — Basic Wound Closure",
+  "short_description": "Guided simulated closure of a forearm laceration on a virtual patient.",
+  "full_description": "A complete guided simulation: review the virtual patient, assess the simulated injury, prepare the training area, select instruments, and perform a guided suturing exercise with safety checks. Educational prototype only.",
+  "difficulty": "Intermediate",
+  "estimated_minutes": 12,
+  "patient_id": "patient_forearm_01",
+  "objectives": [
+    "Complete the virtual patient assessment",
+    "Prepare the simulated training field",
+    "Select the correct instruments",
+    "Perform the guided suturing exercise",
+    "Complete all safety checks"
+  ],
+  "required_tools": ["gloves", "gauze", "antiseptic", "sterile_drape", "needle_holder", "forceps", "curved_needle", "suture_material", "surgical_scissors"],
+  "body_regions": ["right_forearm"],
+  "scoring_weights": {
+    "patient_assessment": 0.10,
+    "procedure_sequence": 0.15,
+    "instrument_selection": 0.10,
+    "entry_accuracy": 0.15,
+    "exit_accuracy": 0.15,
+    "tool_stability": 0.10,
+    "motion_efficiency": 0.10,
+    "safety": 0.10,
+    "completion_time": 0.05
+  },
+  "is_available": true,
+  "steps": [
+    {
+      "id": "review_patient_information", "order": 1, "phase": "review",
+      "title": "Review patient information",
+      "instruction": "Open the patient panel and confirm identity, complaint, and mechanism of injury.",
+      "hint": "Use the patient panel before examining the injury.",
+      "required_action": "review_patient", "required_target": null, "required_tool": null,
+      "allowed_tools": [],
+      "completion_rule": { "type": "exact_action", "action": "review_patient" },
+      "score_value": 4, "safety_critical": true, "checklist_key": "review",
+      "metric_category": "patient_assessment"
+    },
+    {
+      "id": "confirm_allergy_status", "order": 2, "phase": "review",
+      "title": "Confirm allergy status",
+      "instruction": "Ask the virtual patient about allergies before preparing the field.",
+      "hint": "Use the predefined allergy question in the patient panel.",
+      "required_action": "ask_patient", "required_target": "allergy_status", "required_tool": null,
+      "allowed_tools": [],
+      "completion_rule": { "type": "exact_action", "action": "ask_patient", "target": "allergy_status" },
+      "score_value": 4, "safety_critical": true, "checklist_key": "allergy",
+      "metric_category": "patient_assessment"
+    },
+    {
+      "id": "select_right_forearm", "order": 3, "phase": "identify",
+      "title": "Select the injured body region",
+      "instruction": "Select the right forearm directly on the virtual patient.",
+      "hint": "The patient reports pain around the right forearm.",
+      "required_action": "select_body_region", "required_target": "right_forearm", "required_tool": null,
+      "allowed_tools": [],
+      "completion_rule": { "type": "exact_action", "action": "select_body_region", "target": "right_forearm" },
+      "score_value": 4, "safety_critical": true, "checklist_key": "identify",
+      "metric_category": "patient_assessment"
+    },
+    {
+      "id": "inspect_wound", "order": 4, "phase": "identify",
+      "title": "Inspect the simulated wound",
+      "instruction": "Select Inspect and examine the training area on the right forearm.",
+      "hint": "Zoom to the close-up camera for a better view.",
+      "required_action": "inspect", "required_target": "right_forearm", "required_tool": null,
+      "allowed_tools": [],
+      "completion_rule": { "type": "exact_action", "action": "inspect" },
+      "score_value": 4, "safety_critical": false, "checklist_key": null,
+      "metric_category": "patient_assessment"
+    },
+    {
+      "id": "check_distal_pulse", "order": 5, "phase": "assess",
+      "title": "Check distal pulse",
+      "instruction": "Check the simulated radial pulse distal to the injury.",
+      "hint": "Circulation checks come before field preparation.",
+      "required_action": "check_pulse", "required_target": null, "required_tool": null,
+      "allowed_tools": [],
+      "completion_rule": { "type": "exact_action", "action": "check_pulse" },
+      "score_value": 5, "safety_critical": true, "checklist_key": null,
+      "metric_category": "patient_assessment"
+    },
+    {
+      "id": "check_sensation", "order": 6, "phase": "assess",
+      "title": "Check sensation",
+      "instruction": "Check sensation in the virtual patient's fingers.",
+      "hint": "Ask about numbness or tingling.",
+      "required_action": "check_sensation", "required_target": null, "required_tool": null,
+      "allowed_tools": [],
+      "completion_rule": { "type": "exact_action", "action": "check_sensation" },
+      "score_value": 5, "safety_critical": true, "checklist_key": null,
+      "metric_category": "patient_assessment"
+    },
+    {
+      "id": "check_finger_movement", "order": 7, "phase": "assess",
+      "title": "Check finger movement",
+      "instruction": "Ask the virtual patient to move their fingers.",
+      "hint": "Movement completes the circulation-sensation-movement assessment.",
+      "required_action": "check_movement", "required_target": null, "required_tool": null,
+      "allowed_tools": [],
+      "completion_rule": { "type": "exact_action", "action": "check_movement" },
+      "score_value": 5, "safety_critical": true, "checklist_key": null,
+      "metric_category": "patient_assessment"
+    },
+    {
+      "id": "apply_gloves", "order": 8, "phase": "prepare",
+      "title": "Apply gloves",
+      "instruction": "Select gloves from the tray to begin sterile preparation.",
+      "hint": "Preparation supplies are in the toolbar.",
+      "required_action": "apply_gloves", "required_target": null, "required_tool": "gloves",
+      "allowed_tools": ["gloves"],
+      "completion_rule": { "type": "exact_action", "action": "apply_gloves" },
+      "score_value": 4, "safety_critical": true, "checklist_key": null,
+      "metric_category": "procedure_sequence"
+    },
+    {
+      "id": "clean_training_area", "order": 9, "phase": "prepare",
+      "title": "Clean the training area",
+      "instruction": "Use the antiseptic applicator on the simulated wound area.",
+      "hint": "Clean before draping.",
+      "required_action": "clean_training_area", "required_target": null, "required_tool": "antiseptic",
+      "allowed_tools": ["antiseptic", "gauze"],
+      "completion_rule": { "type": "exact_action", "action": "clean_training_area" },
+      "score_value": 4, "safety_critical": true, "checklist_key": null,
+      "metric_category": "procedure_sequence"
+    },
+    {
+      "id": "apply_sterile_drape", "order": 10, "phase": "prepare",
+      "title": "Apply the sterile drape",
+      "instruction": "Place the simulated sterile drape around the training area.",
+      "hint": "The drape completes field preparation.",
+      "required_action": "apply_drape", "required_target": null, "required_tool": "sterile_drape",
+      "allowed_tools": ["sterile_drape"],
+      "completion_rule": { "type": "exact_action", "action": "apply_drape" },
+      "score_value": 4, "safety_critical": true, "checklist_key": "prepare",
+      "metric_category": "procedure_sequence"
+    },
+    {
+      "id": "select_needle_holder", "order": 11, "phase": "instruments",
+      "title": "Select the needle holder",
+      "instruction": "Choose the needle holder as the primary active instrument.",
+      "hint": "The needle holder grips the curved needle.",
+      "required_action": "select_tool", "required_target": null, "required_tool": "needle_holder",
+      "allowed_tools": ["needle_holder"],
+      "completion_rule": { "type": "tool_selected", "tool_id": "needle_holder" },
+      "score_value": 5, "safety_critical": false, "checklist_key": "instruments",
+      "metric_category": "instrument_selection"
+    },
+    {
+      "id": "select_forceps", "order": 12, "phase": "instruments",
+      "title": "Select the forceps",
+      "instruction": "Choose the forceps as the supporting instrument.",
+      "hint": "Forceps stabilize the simulated tissue edge.",
+      "required_action": "select_tool", "required_target": null, "required_tool": "forceps",
+      "allowed_tools": ["forceps", "needle_holder"],
+      "completion_rule": { "type": "tool_selected", "tool_id": "forceps" },
+      "score_value": 5, "safety_critical": false, "checklist_key": null,
+      "metric_category": "instrument_selection"
+    },
+    {
+      "id": "position_needle", "order": 13, "phase": "suture",
+      "title": "Position the needle",
+      "instruction": "Position the simulated curved needle with the needle holder.",
+      "hint": "Recommended approach angle: 45°–60°.",
+      "required_action": "position_tool", "required_target": null, "required_tool": "needle_holder",
+      "allowed_tools": ["needle_holder", "forceps"],
+      "completion_rule": {
+        "type": "all_conditions",
+        "conditions": [
+          { "field": "action", "operator": "equals", "value": "position_tool" },
+          { "field": "selected_tool", "operator": "equals", "value": "needle_holder" }
+        ]
+      },
+      "score_value": 5, "safety_critical": false, "checklist_key": null,
+      "metric_category": "entry_accuracy"
+    },
+    {
+      "id": "approach_entry_zone", "order": 14, "phase": "suture",
+      "title": "Approach the entry zone",
+      "instruction": "Move the needle tip to the highlighted entry marker and begin the stitch.",
+      "hint": "Move closer to the entry marker.",
+      "required_action": "begin_stitch", "required_target": "entry_zone", "required_tool": "needle_holder",
+      "allowed_tools": ["needle_holder", "forceps"],
+      "completion_rule": { "type": "exact_action", "action": "begin_stitch" },
+      "score_value": 5, "safety_critical": false, "checklist_key": null,
+      "metric_category": "entry_accuracy"
+    },
+    {
+      "id": "follow_guided_needle_arc", "order": 15, "phase": "suture",
+      "title": "Follow the guided needle arc",
+      "instruction": "Advance the needle along the guided arc through the simulated tissue.",
+      "hint": "Rotate smoothly; avoid sudden corrections.",
+      "required_action": "advance_needle", "required_target": null, "required_tool": "needle_holder",
+      "allowed_tools": ["needle_holder", "forceps"],
+      "completion_rule": { "type": "exact_action", "action": "advance_needle" },
+      "score_value": 5, "safety_critical": false, "checklist_key": null,
+      "metric_category": "tool_stability"
+    },
+    {
+      "id": "reach_exit_zone", "order": 16, "phase": "suture",
+      "title": "Reach the exit zone",
+      "instruction": "Bring the needle tip out through the highlighted exit marker.",
+      "hint": "Aim for symmetry with the entry point.",
+      "required_action": "reach_exit", "required_target": "exit_zone", "required_tool": "needle_holder",
+      "allowed_tools": ["needle_holder", "forceps"],
+      "completion_rule": { "type": "exact_action", "action": "reach_exit" },
+      "score_value": 5, "safety_critical": false, "checklist_key": null,
+      "metric_category": "exit_accuracy"
+    },
+    {
+      "id": "pull_suture", "order": 17, "phase": "suture",
+      "title": "Pull the simulated suture",
+      "instruction": "Pull the simulated suture material through with even tension.",
+      "hint": "Keep tension steady and moderate.",
+      "required_action": "pull_suture", "required_target": null, "required_tool": "needle_holder",
+      "allowed_tools": ["needle_holder", "forceps"],
+      "completion_rule": { "type": "exact_action", "action": "pull_suture" },
+      "score_value": 4, "safety_critical": false, "checklist_key": null,
+      "metric_category": "motion_efficiency"
+    },
+    {
+      "id": "complete_knot_sequence", "order": 18, "phase": "suture",
+      "title": "Complete the knot sequence",
+      "instruction": "Perform three simulated knot throws in order.",
+      "hint": "Alternate throw direction for a square knot.",
+      "required_action": "knot_action", "required_target": null, "required_tool": "needle_holder",
+      "allowed_tools": ["needle_holder", "forceps"],
+      "completion_rule": { "type": "ordered_actions", "actions": ["knot_throw_1", "knot_throw_2", "knot_throw_3"] },
+      "score_value": 6, "safety_critical": false, "checklist_key": null,
+      "metric_category": "motion_efficiency"
+    },
+    {
+      "id": "cut_suture", "order": 19, "phase": "suture",
+      "title": "Cut the simulated suture",
+      "instruction": "Select the scissors and cut the simulated suture tails.",
+      "hint": "Leave short, even tails.",
+      "required_action": "cut_suture", "required_target": null, "required_tool": "surgical_scissors",
+      "allowed_tools": ["surgical_scissors"],
+      "completion_rule": { "type": "exact_action", "action": "cut_suture" },
+      "score_value": 4, "safety_critical": false, "checklist_key": null,
+      "metric_category": "procedure_sequence"
+    },
+    {
+      "id": "reassess_training_area", "order": 20, "phase": "complete",
+      "title": "Reassess the training area",
+      "instruction": "Inspect the completed stitch and confirm the simulated field is safe.",
+      "hint": "Complete the final reassessment before ending the scenario.",
+      "required_action": "inspect", "required_target": "right_forearm", "required_tool": null,
+      "allowed_tools": [],
+      "completion_rule": { "type": "exact_action", "action": "inspect" },
+      "score_value": 5, "safety_critical": true, "checklist_key": "safety",
+      "metric_category": "safety"
+    },
+    {
+      "id": "complete_procedure", "order": 21, "phase": "complete",
+      "title": "Complete the procedure",
+      "instruction": "Confirm completion to end the guided scenario.",
+      "hint": "Review the checklist before finishing.",
+      "required_action": "complete_step", "required_target": null, "required_tool": null,
+      "allowed_tools": [],
+      "completion_rule": { "type": "exact_action", "action": "complete_step" },
+      "score_value": 4, "safety_critical": false, "checklist_key": "complete",
+      "metric_category": "procedure_sequence"
+    }
+  ]
+}

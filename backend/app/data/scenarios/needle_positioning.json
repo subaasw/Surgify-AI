@@ -1,0 +1,45 @@
+{
+  "id": "scenario_needle_positioning",
+  "slug": "needle-positioning",
+  "name": "Needle Positioning",
+  "short_description": "Orient a simulated curved needle at the correct approach angle.",
+  "full_description": "A short guided exercise: load the curved needle, match the target approach angle, and hold steady within tolerance.",
+  "difficulty": "Intermediate",
+  "estimated_minutes": 14,
+  "patient_id": "patient_training_board",
+  "objectives": ["Load the needle correctly", "Match the target angle", "Hold position steadily"],
+  "required_tools": ["needle_holder", "curved_needle"],
+  "body_regions": ["training_board"],
+  "scoring_weights": {
+    "patient_assessment": 0.0, "procedure_sequence": 0.15, "instrument_selection": 0.15,
+    "entry_accuracy": 0.20, "exit_accuracy": 0.05, "tool_stability": 0.25,
+    "motion_efficiency": 0.10, "safety": 0.05, "completion_time": 0.05
+  },
+  "is_available": true,
+  "steps": [
+    {
+      "id": "select_needle_holder_np", "order": 1, "phase": "instruments",
+      "title": "Select the needle holder", "instruction": "Choose the needle holder from the tray.",
+      "hint": "Grip at the proximal third of the needle.", "required_action": "select_tool",
+      "required_target": null, "required_tool": "needle_holder", "allowed_tools": ["needle_holder"],
+      "completion_rule": { "type": "tool_selected", "tool_id": "needle_holder" },
+      "score_value": 25, "safety_critical": false, "checklist_key": "instruments", "metric_category": "instrument_selection"
+    },
+    {
+      "id": "match_target_angle", "order": 2, "phase": "suture",
+      "title": "Match the target angle", "instruction": "Rotate the needle to the highlighted target angle.",
+      "hint": "Recommended approach angle: 45°–60°.", "required_action": "position_tool",
+      "required_target": "angle_target", "required_tool": "needle_holder", "allowed_tools": ["needle_holder"],
+      "completion_rule": { "type": "exact_action", "action": "position_tool" },
+      "score_value": 45, "safety_critical": false, "checklist_key": null, "metric_category": "entry_accuracy"
+    },
+    {
+      "id": "finish_needle_exercise", "order": 3, "phase": "complete",
+      "title": "Complete the exercise", "instruction": "Confirm completion to end the exercise.",
+      "hint": "Hold the angle for a moment before finishing.", "required_action": "complete_step",
+      "required_target": null, "required_tool": null, "allowed_tools": [],
+      "completion_rule": { "type": "exact_action", "action": "complete_step" },
+      "score_value": 30, "safety_critical": false, "checklist_key": "complete", "metric_category": "procedure_sequence"
+    }
+  ]
+}

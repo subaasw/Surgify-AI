@@ -1,0 +1,36 @@
+[
+  {
+    "id": "patient_forearm_01",
+    "display_name": "Alex Morgan",
+    "age": 34,
+    "sex": "male",
+    "case_id": "CASE-FA-001",
+    "chief_complaint": "Laceration on the right forearm",
+    "mechanism": "Cut on a metal shelf edge while moving furniture approximately forty minutes ago.",
+    "current_status": "Alert, oriented, and in mild discomfort. Simulated bleeding is controlled.",
+    "allergies": [],
+    "medical_history": ["No significant medical history", "Tetanus status up to date (simulated record)"],
+    "vital_signs": { "heart_rate": 88, "systolic_bp": 122, "diastolic_bp": 78, "spo2": 98, "respiratory_rate": 16, "temperature_c": 36.8 },
+    "dialogue": [
+      { "question_id": "pain_location", "question": "Where is the pain?", "answer": "The pain is mostly around my right forearm, near the cut.", "emotion": "uncomfortable" },
+      { "question_id": "allergy_status", "question": "Do you have allergies?", "answer": "I do not have any known allergies.", "emotion": "neutral" },
+      { "question_id": "injury_time", "question": "When did the injury occur?", "answer": "About forty minutes ago while I was moving a metal shelf.", "emotion": "neutral" },
+      { "question_id": "finger_movement", "question": "Can you move your fingers?", "answer": "Yes. It hurts slightly, but I can move all of my fingers.", "emotion": "reassured" },
+      { "question_id": "numbness", "question": "Do you feel numbness?", "answer": "No numbness or tingling. Sensation feels normal.", "emotion": "neutral" }
+    ]
+  },
+  {
+    "id": "patient_training_board",
+    "display_name": "Training Board",
+    "age": 0,
+    "sex": "n/a",
+    "case_id": "CASE-TB-000",
+    "chief_complaint": "Skills training board (no virtual patient)",
+    "mechanism": "Not applicable — bench exercise.",
+    "current_status": "Ready.",
+    "allergies": [],
+    "medical_history": [],
+    "vital_signs": { "heart_rate": 0, "systolic_bp": 0, "diastolic_bp": 0, "spo2": 0, "respiratory_rate": 0, "temperature_c": 0 },
+    "dialogue": []
+  }
+]
