@@ -19,10 +19,10 @@ export const checklistItems = [
 ] as const;
 
 export const scenarioTiles = [
-  { id: "forearm", name: "Forearm Laceration", condition: "Basic wound closure", difficulty: "Intermediate", duration: 18, skills: ["Patient assessment", "Sterile preparation", "Simple suturing"], progress: 42, status: "Continue" },
-  { id: "incision", name: "Incision Path Control", condition: "Tool stability and precision", difficulty: "Beginner", duration: 8, skills: ["Path accuracy", "Pressure control", "Stability"], progress: 84, status: "Completed" },
-  { id: "peg", name: "Peg Transfer", condition: "Bimanual coordination", difficulty: "Beginner", duration: 12, skills: ["Coordination", "Object transfer", "Efficiency"], progress: 62, status: "In progress" },
-  { id: "needle", name: "Needle Positioning", condition: "Instrument and needle control", difficulty: "Intermediate", duration: 14, skills: ["Needle angle", "Grip control", "Precision"], progress: 31, status: "Available" },
+  { id: "forearm", name: "Forearm Laceration", image: "/images/scenarios/forearm-laceration.jpg", condition: "Basic wound closure", difficulty: "Intermediate", duration: 18, skills: ["Patient assessment", "Sterile preparation", "Simple suturing"], progress: 42, status: "Continue" },
+  { id: "incision", name: "Incision Path Control", image: "/images/scenarios/incision-path-control.jpg", condition: "Tool stability and precision", difficulty: "Beginner", duration: 8, skills: ["Path accuracy", "Pressure control", "Stability"], progress: 84, status: "Completed" },
+  { id: "peg", name: "Peg Transfer", image: "/images/scenarios/peg-transfer.jpg", condition: "Bimanual coordination", difficulty: "Beginner", duration: 12, skills: ["Coordination", "Object transfer", "Efficiency"], progress: 62, status: "In progress" },
+  { id: "needle", name: "Needle Positioning", image: "/images/scenarios/needle-positioning.jpg", condition: "Instrument and needle control", difficulty: "Intermediate", duration: 14, skills: ["Needle angle", "Grip control", "Precision"], progress: 31, status: "Available" },
 ];
 
 export const patientAnswers: Record<string, string> = {

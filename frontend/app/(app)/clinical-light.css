@@ -1,0 +1,107 @@
+/* Shared clinical-light surfaces. Kept here so page behavior stays untouched. */
+.simulation-app{background:var(--bg)}
+.simulation-app .app-rail{background:#fff;border-color:var(--border);box-shadow:2px 0 14px rgba(31,78,113,.06)}
+.simulation-app .rail-link{color:#6d879b}
+.simulation-app .rail-link:hover{color:var(--cyan);background:#edf6fc}
+.simulation-app .rail-link.active{color:var(--cyan);background:#e6f2fb;border-color:rgba(20,120,201,.2)}
+.simulation-app .rail-link span,.simulation-app .rail-avatar span{background:#fff;color:var(--text);box-shadow:0 8px 20px rgba(31,78,113,.14)}
+.simulation-app .rail-avatar{color:#fff;background:linear-gradient(145deg,#1478c9,#2563eb)}
+.simulation-app .app-page{background:var(--bg)}
+.simulation-app .app-page-header{background:rgba(255,255,255,.96);box-shadow:0 2px 12px rgba(31,78,113,.05)}
+.simulation-app .app-page-header p{color:var(--muted)}
+
+/* Launcher, results and settings. */
+.simulation-app :is(.scenario-app-search,.app-page-header-actions>button,.launcher-toolbar>div:last-child,.launcher-tile,.launcher-note,.scenario-result-summary,.scenario-metric,.action-review,.result-timeline,.coach-summary,.result-footer-actions button,.result-time-chip,.settings-app-panel,.shortcut-list kbd,.instrument-app-chip){background:#fff;color:var(--text);border-color:var(--border);box-shadow:0 8px 24px rgba(31,78,113,.06)}
+.simulation-app .scenario-app-search input{color:var(--text)}
+.simulation-app .launcher-toolbar button.active{background:#e4f2fb;color:var(--cyan)}
+.simulation-app .tile-status{background:rgba(255,255,255,.9);color:var(--text)}
+.simulation-app :is(.launcher-skills small,.sim-preferences>div>span){background:#edf5fb;color:#39769f;border-color:var(--border)}
+.simulation-app .launcher-progress>i,.simulation-app .scenario-metric>i{background:#dce8f1}
+.simulation-app .launch-scenario{background:#e4f2fb;color:var(--cyan);border-color:rgba(20,120,201,.25)}
+.simulation-app .result-score-dial{background:conic-gradient(var(--cyan) var(--score),#d9e6ef 0)}
+.simulation-app .result-score-dial::before{background:#fff}
+.simulation-app .sim-switch{background:#d8e5ee;border-color:#b7cad8}
+.simulation-app .sim-switch.on{background:var(--cyan);border-color:var(--cyan)}
+.simulation-app .user-settings-card strong{color:var(--text)}
+
+/* Anatomy and instrument labs. */
+.simulation-app :is(.anatomy-controls,.anatomy-stage,.structure-info,.instrument-list>button,.instrument-stage,.instrument-info){background:#fff;color:var(--text);border-color:var(--border);box-shadow:0 10px 28px rgba(31,78,113,.08)}
+.simulation-app :is(.body-regions button,.anatomy-stage-top button,.instrument-stage-toolbar button){background:#f2f7fb;color:var(--muted);border-color:var(--border)}
+.simulation-app :is(.body-regions button.active,.anatomy-stage-top button.active,.instrument-stage-toolbar button.active){background:#e2f1fb;color:var(--cyan);border-color:rgba(20,120,201,.28)}
+.simulation-app :is(.layer-main,.layer-visibility,.layer-main span strong,.instrument-list strong,.instrument-info dd,.scene-fallback strong){color:var(--text)}
+.simulation-app :is(.layer-main span small,.structure-info>p:not(.eyebrow):not(.education-note),.training-relevance p,.instrument-list small,.instrument-info dt,.selected-part p,.scene-fallback span){color:var(--muted)!important}
+.simulation-app .layer-row:hover,.simulation-app .layer-row.selected{background:#edf6fc}
+.simulation-app .exploded-control input[type="range"]{background:#d9e6ef}
+.simulation-app .anatomy-canvas{background:radial-gradient(ellipse at 50% 40%,rgba(20,120,201,.12),transparent 52%),#eaf3f8}
+.simulation-app .anatomy-label{color:#194967;background:rgba(255,255,255,.9);border-color:rgba(20,120,201,.28);box-shadow:0 2px 8px rgba(31,78,113,.12)}
+.simulation-app .structure-color>small{color:var(--text);background:rgba(255,255,255,.84)}
+.simulation-app .structure-facts>div{background:#f4f8fc;border-color:var(--border)}
+.simulation-app .training-relevance,.simulation-app .selected-part{background:#edf7fd}
+.simulation-app .anatomy-app-status,.simulation-app .anatomy-app-mode,.simulation-app .instrument-stage-toolbar,.simulation-app .instrument-part-tabs{background:rgba(255,255,255,.92);color:var(--muted);border-color:var(--border)}
+.simulation-app .instrument-list>button:hover,.simulation-app .instrument-list>button.active{background:#edf6fc;border-color:rgba(20,120,201,.3)}
+.simulation-app .instrument-part-tabs button{color:var(--muted)}
+.simulation-app .instrument-part-tabs button.active{color:var(--cyan);background:#e1f0fa}
+
+/* The simulation owns the viewport; controls float above the room. */
+body:has(.simulation-page) .app-rail{display:none}
+.simulation-main:has(.simulation-page){margin-left:0}
+.simulation-app .simulation-page{position:fixed;inset:0;z-index:100;background:var(--bg)}
+.simulation-app .simulation-topbar{height:68px;background:rgba(255,255,255,.97);border-color:var(--border);box-shadow:0 3px 18px rgba(31,78,113,.1)}
+.simulation-app .simulation-body{height:calc(100vh - 68px);display:block}
+.simulation-app .simulation-center{position:absolute;inset:0;display:block;margin:0;background:#d8e2e7}
+.simulation-app .simulation-viewport{position:absolute;inset:0}
+.simulation-app .patient-panel,.simulation-app .procedure-panel{position:absolute;top:16px;bottom:16px;z-index:30;height:auto;overflow:auto;flex:none;background:rgba(255,255,255,.94);border:1px solid rgba(43,93,130,.18);border-radius:12px;box-shadow:0 16px 40px rgba(31,78,113,.16);backdrop-filter:blur(12px)}
+.simulation-app .patient-panel{left:16px;width:270px}
+.simulation-app .procedure-panel{right:16px;width:300px}
+.simulation-app .patient-panel.collapsed,.simulation-app .procedure-panel.collapsed{width:34px;bottom:auto;height:180px}
+.simulation-app .panel-collapse{background:#fff;color:var(--cyan);border-color:var(--border)}
+.simulation-app .patient-collapse{right:-1px;border:1px solid var(--border);border-radius:0 10px 0 8px}
+.simulation-app .procedure-collapse{left:-1px;border:1px solid var(--border);border-radius:10px 0 8px 0}
+.simulation-app .tool-bar{position:absolute;left:302px;right:332px;bottom:16px;z-index:40;height:106px;grid-template-columns:90px 1fr 165px;background:rgba(255,255,255,.95);border:1px solid rgba(43,93,130,.18);border-radius:12px;box-shadow:0 14px 36px rgba(31,78,113,.16);backdrop-filter:blur(12px);overflow:hidden}
+.simulation-app .viewport-top-left{left:302px;top:16px;background:rgba(255,255,255,.9);border-color:var(--border);box-shadow:0 8px 20px rgba(31,78,113,.1)}
+.simulation-app .viewport-top-left :is(span,strong){color:var(--text)}
+.simulation-app .view-preset-dock{right:332px;top:16px;background:rgba(255,255,255,.9);border-color:var(--border);box-shadow:0 8px 20px rgba(31,78,113,.1)}
+.simulation-app .view-preset-dock button{color:var(--muted)}
+.simulation-app .view-preset-dock button.active{color:var(--cyan);background:#e1f0fa}
+.simulation-app .view-preset-dock span{background:#fff;color:var(--text)}
+.simulation-app .selected-region-card{left:302px;top:76px;background:rgba(255,255,255,.94);border-color:var(--border);box-shadow:0 10px 28px rgba(31,78,113,.12)}
+.simulation-app .suture-interaction{right:332px;bottom:138px;background:rgba(255,255,255,.95);border-color:rgba(20,120,201,.3);box-shadow:0 14px 36px rgba(31,78,113,.16)}
+.simulation-app .viewport-bottom-status{left:302px;right:332px;bottom:130px;background:rgba(255,255,255,.88);border-color:var(--border);color:var(--muted)}
+.simulation-app .viewport-bottom-status b{color:#536d80}
+
+/* Light panel internals. */
+.simulation-app :is(.patient-avatar,.patient-identity>b,.vital-cell,.patient-answer,.question-list button,.ecg-strip,.region-action-chips button,.tool-items>button,.tool-items>button>span,.sim-step-list li.active,.coach-status,.coach-item,.checklist-summary,.position-track,.angle-control>div){background:#f1f7fb;color:var(--text);border-color:var(--border)}
+.simulation-app :is(.topbar-scenario>div strong,.clinical-summary dd,.patient-answer p,.selected-region-card strong,.sim-step-list strong,.sim-step-list li.active strong,.coach-item strong,.paused-overlay strong,.camera-start-card strong){color:var(--text)}
+.simulation-app :is(.topbar-scenario>div span,.clinical-summary dt,.patient-identity span,.patient-identity small,.question-list button,.procedure-title p,.sim-step-list p,.coach-item p,.checklist-list p){color:var(--muted)}
+.simulation-app .topbar-actions :is(button,a):hover{background:#edf5fb;color:var(--cyan);border-color:var(--border)}
+.simulation-app .stage-progress>i,.simulation-app .checklist-summary>i{background:#d9e6ef}
+.simulation-app .review-button{background:#eaf5fc;color:var(--cyan);border-color:rgba(20,120,201,.24)}
+.simulation-app .tool-categories{background:#f6f9fc}
+.simulation-app .tool-categories button{color:var(--muted)}
+.simulation-app .tool-categories button.active{background:#dfeff9;color:var(--cyan)}
+.simulation-app .tool-items>button:hover,.simulation-app .tool-items>button.selected{background:#e4f2fb;color:var(--cyan);border-color:rgba(20,120,201,.3)}
+.simulation-app .procedure-tabs{background:#f7fafc}
+.simulation-app .procedure-tabs button.active{color:var(--cyan);background:#eaf5fc;border-bottom-color:var(--cyan)}
+.simulation-app .advance-stitch{background:var(--cyan);color:#fff}
+.simulation-app .position-track>button{background:#e0f2fb;color:var(--cyan);border-color:var(--cyan)}
+.simulation-app .paused-overlay{inset:68px 0 0;background:rgba(220,232,239,.72)}
+.simulation-app .paused-overlay>div,.simulation-app .camera-start-card{background:rgba(255,255,255,.96);box-shadow:0 16px 40px rgba(31,78,113,.16)}
+
+@media(max-width:1100px){
+  .simulation-app .patient-panel{width:240px}
+  .simulation-app .procedure-panel{width:270px}
+  .simulation-app .tool-bar,.simulation-app .viewport-bottom-status{left:256px;right:286px}
+  .simulation-app .viewport-top-left,.simulation-app .selected-region-card{left:256px}
+  .simulation-app .view-preset-dock,.simulation-app .suture-interaction{right:286px}
+}
+@media(max-width:760px){
+  html{font-size:17px}
+  .simulation-app .simulation-topbar{height:58px}
+  .simulation-app .simulation-body{height:calc(100vh - 58px)}
+  .simulation-app .patient-panel{left:8px;top:8px;bottom:8px;width:220px}
+  .simulation-app .procedure-panel{right:8px;top:8px;bottom:8px;width:240px}
+  .simulation-app .tool-bar{left:42px;right:42px;bottom:8px}
+  .simulation-app .viewport-top-left,.simulation-app .selected-region-card{left:42px}
+  .simulation-app .view-preset-dock,.simulation-app .suture-interaction{right:42px}
+  .simulation-app .viewport-bottom-status{display:none}
+}

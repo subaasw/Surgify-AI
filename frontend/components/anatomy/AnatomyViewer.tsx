@@ -116,8 +116,8 @@ export function AnatomyViewer() {
         <div className="anatomy-canvas">
           <SceneErrorBoundary>
             <Canvas camera={{ position: [0, 0.15, 6.4], fov: 40 }} dpr={[1, 1.6]}>
-              <color attach="background" args={["#08131f"]} />
-              <fog attach="fog" args={["#08131f", 7, 13]} />
+              <color attach="background" args={["#eaf3f8"]} />
+              <fog attach="fog" args={["#eaf3f8", 7, 13]} />
               <ambientLight intensity={1.15} />
               <directionalLight position={[4, 6, 5]} intensity={2.4} color="#d9f8ff" />
               <directionalLight position={[-4, -2, 3]} intensity={1.2} color="#2979c7" />
