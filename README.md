@@ -1,36 +1,40 @@
 # Surgify AI
 
-Surgify AI is a polished frontend-only hackathon prototype for accessible, webcam-based surgical skills training. It uses realistic mock data and simulated interactions; it does not provide clinical guidance, diagnosis, certification, or real-patient support.
+AI-assisted surgical simulation and skills-training prototype (hackathon).
 
-## Run locally
+> **Medical disclaimer** — Surgify AI is an educational prototype for simulated skills
+> training. It is not intended for real-patient use, diagnosis, clinical decision-making,
+> treatment planning, medication guidance, or certification of surgical competence.
 
-```bash
-npm install
-npm run dev
+## Monorepo layout
+
+```
+frontend/   Next.js + React Three Fiber app   → http://localhost:3000
+backend/    FastAPI simulation backend (uv)   → http://localhost:8000
+Makefile    orchestrates both apps
 ```
 
-Open the local URL shown in the terminal (normally `http://localhost:3000`).
+## Quick start
 
-## Routes
+```bash
+make install    # npm install (frontend) + uv sync (backend)
+make seed       # backend: create tables + demo data
+make dev        # run frontend (:3000) and backend (:8000) together
+```
 
-- `/` — immediately redirects into the simulation
-- `/simulation` — immersive virtual patient room and guided wound-closure scenario
-- `/scenarios` — clinical simulation launcher
-- `/anatomy` — full-screen interactive anatomy lab
-- `/instruments` — full-screen 3D instrument training environment
-- `/results` — scenario-specific performance review
-- `/settings` — local simulation preferences and data reset
+Or run each app directly:
 
-## Stack
+```bash
+cd frontend && npm run dev
+cd backend && uv run uvicorn app.main:app --reload
+```
 
-Next.js App Router, TypeScript, Tailwind CSS, React Three Fiber, Drei, Recharts, Lucide React, and Framer Motion.
+## Docs
 
-## Prototype integration points
+- Backend API + setup: `backend/README.md` (Swagger at http://localhost:8000/docs)
+- Frontend ↔ backend contract: `backend/docs/frontend-api-contract.md`
+- WebSocket events: `backend/docs/websocket-events.md`
+- Scenario authoring: `backend/docs/scenario-authoring.md`
+- Copy-paste API types for the frontend: `backend/frontend-types/surgify-api.ts`
 
-- `components/simulation/WebcamPractice.tsx` contains the optional live camera surface. Real hand/tool tracking can replace the simulated overlay there.
-- `components/simulation/SimulationProvider.tsx` owns the rule-based scenario, checklist, scoring, and coach state.
-- `components/simulation/HospitalScene.tsx` builds the complete room, patient, equipment, wound patch, and guided instrument scene procedurally.
-- `data/modelConfig.ts` is the central registry for future freely licensed GLB/GLTF assets; named procedural fallbacks remain the reliable offline default.
-- `data/mockData.ts` contains the local scenario, session, anatomy, and analytics datasets.
-
-All session, score, streak, and preference persistence in this prototype is device-local via `localStorage`.
+Backend end-to-end check: `make smoke`.
