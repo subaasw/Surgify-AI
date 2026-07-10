@@ -49,3 +49,4 @@ brain/
 .cursor/
 .cursorrules
 .cline/
+.openai/

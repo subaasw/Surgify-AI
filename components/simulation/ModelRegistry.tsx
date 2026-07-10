@@ -16,6 +16,7 @@ type MedicalGLBProps = Omit<ThreeElements["group"], "children"> & {
   emissive?: string;
   emissiveIntensity?: number;
   opacity?: number;
+  wireframe?: boolean;
 };
 
 /**
@@ -32,6 +33,7 @@ export function MedicalGLB({
   emissive = "#000000",
   emissiveIntensity = 0,
   opacity = 1,
+  wireframe = false,
   ...props
 }: MedicalGLBProps) {
   const { scene } = useGLTF(path);
@@ -41,18 +43,21 @@ export function MedicalGLB({
       if (!(object instanceof THREE.Mesh)) return;
       object.castShadow = true;
       object.receiveShadow = true;
-      const authored = Array.isArray(object.material) ? object.material[0] : object.material;
-      const hasTexture = authored && "map" in authored && Boolean(authored.map);
-      if (preserveTextures && hasTexture) {
-        const material = authored.clone();
-        if ("roughness" in material && typeof material.roughness === "number") material.roughness = Math.max(material.roughness, roughness);
-        material.transparent = opacity < 1;
-        material.opacity = opacity;
-        material.depthWrite = opacity >= 1;
-        object.material = material;
-      } else {
-        object.material = new THREE.MeshStandardMaterial({ color, metalness, roughness, emissive, emissiveIntensity, transparent: opacity < 1, opacity, depthWrite: opacity >= 1 });
-      }
+      const authoredMaterials = Array.isArray(object.material) ? object.material : [object.material];
+      const materials = authoredMaterials.map(authored => {
+        const hasTexture = authored && "map" in authored && Boolean(authored.map);
+        if (preserveTextures && hasTexture) {
+          const material = authored.clone();
+          if ("roughness" in material && typeof material.roughness === "number") material.roughness = Math.max(material.roughness, roughness);
+          material.transparent = opacity < 1;
+          material.opacity = opacity;
+          material.depthWrite = opacity >= 1;
+          (material as THREE.Material & { wireframe?: boolean }).wireframe = wireframe;
+          return material;
+        }
+        return new THREE.MeshStandardMaterial({ color, metalness, roughness, emissive, emissiveIntensity, transparent: opacity < 1, opacity, depthWrite: opacity >= 1, wireframe });
+      });
+      object.material = Array.isArray(object.material) ? materials : materials[0];
     });
     clone.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(clone);
@@ -63,12 +68,12 @@ export function MedicalGLB({
     clone.scale.multiplyScalar(scale);
     clone.position.copy(center).multiplyScalar(-scale);
     return clone;
-  }, [scene, targetSize, color, metalness, roughness, preserveTextures, emissive, emissiveIntensity, opacity]);
+  }, [scene, targetSize, color, metalness, roughness, preserveTextures, emissive, emissiveIntensity, opacity, wireframe]);
   return <group {...props}><primitive object={normalized} /></group>;
 }
 
 /** Loads the user-supplied alternate patient FBX when the primary GLB fails. */
-export function MedicalFBX({ path, targetSize = 3, color = "#c9937d", metalness = 0, roughness = .7, preserveTextures = true, opacity = 1, ...props }: MedicalGLBProps) {
+export function MedicalFBX({ path, targetSize = 3, color = "#c9937d", metalness = 0, roughness = .7, preserveTextures = true, opacity = 1, wireframe = false, ...props }: MedicalGLBProps) {
   const source = useLoader(FBXLoader, path);
   const normalized = useMemo(() => {
     const clone = source.clone(true);
@@ -76,17 +81,20 @@ export function MedicalFBX({ path, targetSize = 3, color = "#c9937d", metalness 
       if (!(object instanceof THREE.Mesh)) return;
       object.castShadow = true;
       object.receiveShadow = true;
-      const authored = Array.isArray(object.material) ? object.material[0] : object.material;
-      const hasTexture = authored && "map" in authored && Boolean(authored.map);
-      if (preserveTextures && hasTexture) {
-        const material = authored.clone();
-        material.transparent = opacity < 1;
-        material.opacity = opacity;
-        material.depthWrite = opacity >= 1;
-        object.material = material;
-      } else {
-        object.material = new THREE.MeshStandardMaterial({ color, metalness, roughness, transparent: opacity < 1, opacity, depthWrite: opacity >= 1 });
-      }
+      const authoredMaterials = Array.isArray(object.material) ? object.material : [object.material];
+      const materials = authoredMaterials.map(authored => {
+        const hasTexture = authored && "map" in authored && Boolean(authored.map);
+        if (preserveTextures && hasTexture) {
+          const material = authored.clone();
+          material.transparent = opacity < 1;
+          material.opacity = opacity;
+          material.depthWrite = opacity >= 1;
+          (material as THREE.Material & { wireframe?: boolean }).wireframe = wireframe;
+          return material;
+        }
+        return new THREE.MeshStandardMaterial({ color, metalness, roughness, transparent: opacity < 1, opacity, depthWrite: opacity >= 1, wireframe });
+      });
+      object.material = Array.isArray(object.material) ? materials : materials[0];
     });
     clone.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(clone);
@@ -96,7 +104,7 @@ export function MedicalFBX({ path, targetSize = 3, color = "#c9937d", metalness 
     clone.scale.multiplyScalar(scale);
     clone.position.copy(center).multiplyScalar(-scale);
     return clone;
-  }, [source, targetSize, color, metalness, roughness, preserveTextures, opacity]);
+  }, [source, targetSize, color, metalness, roughness, preserveTextures, opacity, wireframe]);
   return <group {...props}><primitive object={normalized} /></group>;
 }
 
@@ -111,6 +119,10 @@ export class ModelErrorBoundary extends Component<{ fallback: ReactNode; childre
 
 export function SafeMedicalGLB({ fallback, ...props }: MedicalGLBProps & { fallback: ReactNode }) {
   return <ModelErrorBoundary fallback={fallback}><Suspense fallback={fallback}><MedicalGLB {...props} /></Suspense></ModelErrorBoundary>;
+}
+
+export function SafeMedicalFBX({ fallback, ...props }: MedicalGLBProps & { fallback: ReactNode }) {
+  return <ModelErrorBoundary fallback={fallback}><Suspense fallback={fallback}><MedicalFBX {...props} /></Suspense></ModelErrorBoundary>;
 }
 
 function Metal({ active = false }: { active?: boolean }) { return <meshStandardMaterial color={active ? "#59ccd6" : "#b8c4c8"} metalness={.8} roughness={.24} emissive={active ? "#246d76" : "#000"} emissiveIntensity={.3} />; }

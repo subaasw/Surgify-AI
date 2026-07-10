@@ -9,7 +9,7 @@ import type { AnatomyLayer } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { SceneErrorBoundary } from "./SceneErrorBoundary";
-import { SafeMedicalGLB } from "@/components/simulation/ModelRegistry";
+import { SafeMedicalFBX, SafeMedicalGLB } from "@/components/simulation/ModelRegistry";
 import { MODEL_PATHS } from "@/data/modelConfig";
 
 type LayerState = Record<AnatomyLayer["id"], boolean>;
@@ -78,6 +78,7 @@ function FallbackRibCage({ common }: { common: { selected: AnatomyLayer["id"]; w
 }
 function FallbackHeart({ common }: { common: { selected: AnatomyLayer["id"]; wireframe: boolean; transparent: boolean } }) { return <mesh scale={[.42,.55,.34]}><sphereGeometry args={[1,24,20]} /><MaterialProps id="heart" color="#d13e53" {...common} /></mesh>; }
 function FallbackLungs({ common }: { common: { selected: AnatomyLayer["id"]; wireframe: boolean; transparent: boolean } }) { return <group><mesh position={[-.36,0,0]} scale={[.48,.82,.32]}><sphereGeometry args={[1,24,20]} /><MaterialProps id="lungs" color="#e8919d" {...common} /></mesh><mesh position={[.36,0,0]} scale={[.48,.82,.32]}><sphereGeometry args={[1,24,20]} /><MaterialProps id="lungs" color="#e8919d" {...common} /></mesh></group>; }
+function FallbackSkinLayer({ common }: { common: { selected: AnatomyLayer["id"]; wireframe: boolean; transparent: boolean } }) { return <group><mesh scale={[1.28,1.62,.72]}><capsuleGeometry args={[.72,1.45,12,24]} /><MaterialProps id="skin" color="#d6a283" {...common} /></mesh><mesh position={[0,1.72,0]} scale={[.55,.66,.52]}><sphereGeometry args={[1,32,24]} /><MaterialProps id="skin" color="#d6a283" {...common} /></mesh><mesh position={[-1.13,.5,0]} rotation={[0,0,-.12]}><capsuleGeometry args={[.2,1.45,8,16]} /><MaterialProps id="skin" color="#c99275" {...common} /></mesh><mesh position={[1.13,.5,0]} rotation={[0,0,.12]}><capsuleGeometry args={[.2,1.45,8,16]} /><MaterialProps id="skin" color="#c99275" {...common} /></mesh></group>; }
 
 function ProceduralTorso({ visible, selected, exploded, wireframe, transparent, labels, onSelect }: {
   visible: LayerState; selected: AnatomyLayer["id"]; exploded: number; wireframe: boolean; transparent: boolean; labels: boolean; onSelect: (id: AnatomyLayer["id"]) => void;
@@ -86,10 +87,51 @@ function ProceduralTorso({ visible, selected, exploded, wireframe, transparent, 
   const common = { selected, wireframe, transparent };
   return (
     <group scale={1.12} position={[0, -.1, 0]}>
-      {visible.skin && <group onClick={(e) => { e.stopPropagation(); onSelect("skin"); }} position={[0,0,spread*.38]}><mesh scale={[1.28,1.62,.72]}><capsuleGeometry args={[.72,1.45,12,24]} /><MaterialProps id="skin" color="#d6a283" {...common} /></mesh><mesh position={[0,1.72,0]} scale={[.55,.66,.52]}><sphereGeometry args={[1,32,24]} /><MaterialProps id="skin" color="#d6a283" {...common} /></mesh><mesh position={[-1.13,.5,0]} rotation={[0,0,-.12]}><capsuleGeometry args={[.2,1.45,8,16]} /><MaterialProps id="skin" color="#c99275" {...common} /></mesh><mesh position={[1.13,.5,0]} rotation={[0,0,.12]}><capsuleGeometry args={[.2,1.45,8,16]} /><MaterialProps id="skin" color="#c99275" {...common} /></mesh><Label position={[1.35,1.1,.4]} show={labels && selected === "skin"}>Skin layer</Label></group>}
+      {visible.skin && <group onClick={(e) => { e.stopPropagation(); onSelect("skin"); }} position={[0,-.05,spread*.38]}><SafeMedicalFBX path={MODEL_PATHS.alternatePatient} targetSize={4.35} preserveTextures color="#c9937d" roughness={.72} opacity={transparent ? (selected === "skin" ? .28 : .12) : (selected === "skin" ? .82 : .34)} wireframe={wireframe} fallback={<FallbackSkinLayer common={common} />} /><Label position={[1.35,1.1,.4]} show={labels && selected === "skin"}>Skin layer</Label></group>}
       {visible.muscles && <group onClick={(e) => { e.stopPropagation(); onSelect("muscles"); }} position={[-spread*.95,0,.05]}><mesh scale={[1.05,1.45,.58]}><capsuleGeometry args={[.64,1.3,10,20]} /><MaterialProps id="muscles" color="#a94350" {...common} /></mesh>{[-.55,-.18,.18,.55].map(x => <mesh key={x} position={[x,.35,.56]} scale={[.2,.8,.12]}><capsuleGeometry args={[.16,.65,6,12]} /><MaterialProps id="muscles" color="#c65660" {...common} /></mesh>)}<Label position={[-1.25,.85,.35]} show={labels && selected === "muscles"}>Muscle fibres</Label></group>}
-      {visible.skeleton && <group onClick={(e) => { e.stopPropagation(); onSelect("skeleton"); }} position={[spread*1.25,.25,.08]}><SafeMedicalGLB path={MODEL_PATHS.ribCage} targetSize={2.65} color="#e9e1ca" metalness={.02} roughness={.64} preserveTextures={false} opacity={AssetOpacity({id:"skeleton",selected,transparent})} fallback={<FallbackRibCage common={common} />} /><Label position={[1.05,.75,.35]} show={labels && selected === "skeleton"}>Rib cage</Label></group>}
-      {visible.brain && <group onClick={(e) => { e.stopPropagation(); onSelect("brain"); }} position={[-spread*.75,1.72,spread*.8]}><SafeMedicalGLB path={MODEL_PATHS.brain} targetSize={.82} color="#d9a6a6" metalness={0} roughness={.76} preserveTextures={false} opacity={AssetOpacity({id:"brain",selected,transparent})} fallback={<mesh scale={[.48,.38,.45]}><sphereGeometry args={[1,24,18]} /><MaterialProps id="brain" color="#d9a6a6" {...common} /></mesh>} /><Label position={[.7,.2,.25]} show={labels && selected === "brain"}>Brain</Label></group>}
+      {
+  visible.skeleton && (
+    <group
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect("skeleton");
+      }}
+      position={[spread * 1.25, 0.5, 0.08]}
+      rotation={[0, Math.PI * 1.5, 0]} // 270°
+      scale={0.75}
+    >
+      <group rotation={[0, 0, Math.PI / 2]}>
+        <SafeMedicalGLB
+          path={MODEL_PATHS.ribCage}
+          targetSize={1.85}
+          color="#e9e1ca"
+          metalness={0.02}
+          roughness={0.64}
+          preserveTextures={false}
+          opacity={AssetOpacity({
+            id: "skeleton",
+            selected,
+            transparent,
+          })}
+          rotation={[0, Math.PI / 2, 0]}
+          fallback={
+            <group rotation={[0, 0, -Math.PI / 2]}>
+              <FallbackRibCage common={common} />
+            </group>
+          }
+        />
+      </group>
+
+      <Label
+        position={[-0.78, 0.55, 0.25]}
+        show={labels && selected === "skeleton"}
+      >
+        Rib cage
+      </Label>
+    </group>
+  )
+}
+      {visible.brain && <group onClick={(e) => { e.stopPropagation(); onSelect("brain"); }} position={[-spread*.75,1.72,spread*.8]}><group rotation={[0,0,Math.PI/2]}><SafeMedicalGLB path={MODEL_PATHS.brain} targetSize={.82} color="#d9a6a6" metalness={0} roughness={.76} preserveTextures={false} opacity={AssetOpacity({id:"brain",selected,transparent})} rotation={[0,Math.PI/2,0]} fallback={<mesh scale={[.48,.38,.45]}><sphereGeometry args={[1,24,18]} /><MaterialProps id="brain" color="#d9a6a6" {...common} /></mesh>} /></group><Label position={[.7,.2,.25]} show={labels && selected === "brain"}>Brain</Label></group>}
       {visible.heart && <group onClick={(e) => { e.stopPropagation(); onSelect("heart"); }} position={[spread*.25,.43,spread*1.4+.48]} rotation={[0,0,-.08]}><SafeMedicalGLB path={MODEL_PATHS.heart} targetSize={.95} preserveTextures opacity={AssetOpacity({id:"heart",selected,transparent})} fallback={<FallbackHeart common={common} />} /><Label position={[.78,.25,.25]} show={labels && selected === "heart"}>Heart</Label></group>}
       {visible.lungs && <group onClick={(e) => { e.stopPropagation(); onSelect("lungs"); }} position={[-spread*.35,.55,spread*1.1+.35]}><SafeMedicalGLB path={MODEL_PATHS.lungs} targetSize={1.65} color="#e58f9b" metalness={0} roughness={.72} preserveTextures={false} opacity={AssetOpacity({id:"lungs",selected,transparent})} fallback={<FallbackLungs common={common} />} /><Label position={[-1.05,.3,.2]} show={labels && selected === "lungs"}>Lungs</Label></group>}
       {visible.kidney && <group onClick={(e) => { e.stopPropagation(); onSelect("kidney"); }} position={[spread*.8,-.62,spread*.95+.32]}><SafeMedicalGLB path={MODEL_PATHS.kidney} targetSize={.62} color="#984d46" metalness={0} roughness={.7} preserveTextures={false} opacity={AssetOpacity({id:"kidney",selected,transparent})} position={[-.42,0,0]} rotation={[0,.45,-.12]} fallback={<mesh scale={[.28,.42,.2]}><sphereGeometry args={[1,20,16]} /><MaterialProps id="kidney" color="#984d46" {...common} /></mesh>} /><SafeMedicalGLB path={MODEL_PATHS.kidney} targetSize={.62} color="#984d46" metalness={0} roughness={.7} preserveTextures={false} opacity={AssetOpacity({id:"kidney",selected,transparent})} position={[.42,0,0]} rotation={[0,-.45,.12]} fallback={<mesh position={[.42,0,0]} scale={[.28,.42,.2]}><sphereGeometry args={[1,20,16]} /><MaterialProps id="kidney" color="#984d46" {...common} /></mesh>} /><Label position={[.95,.1,.2]} show={labels && selected === "kidney"}>Kidneys</Label></group>}
