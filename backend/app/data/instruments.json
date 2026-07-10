@@ -1,0 +1,112 @@
+[
+  {
+    "id": "gloves", "name": "Sterile Gloves", "frontend_label": "Gloves", "category": "preparation",
+    "description": "Simulated sterile gloves for field preparation.", "primary_use": "Hand protection and sterile technique practice.",
+    "grip_zone": "cuff", "active_tip": "none",
+    "common_mistakes": ["Touching non-sterile surfaces after gloving"],
+    "model_path": null, "icon": "gloves",
+    "parts": []
+  },
+  {
+    "id": "gauze", "name": "Gauze Pads", "frontend_label": "Gauze", "category": "preparation",
+    "description": "Simulated absorbent gauze pads.", "primary_use": "Dabbing and clearing the simulated training area.",
+    "grip_zone": "edge", "active_tip": "pad surface",
+    "common_mistakes": ["Wiping instead of dabbing"],
+    "model_path": null, "icon": "gauze",
+    "parts": []
+  },
+  {
+    "id": "antiseptic", "name": "Antiseptic Applicator", "frontend_label": "Antiseptic", "category": "preparation",
+    "description": "Simulated antiseptic applicator for cleansing practice.", "primary_use": "Cleansing the synthetic training patch in outward spirals.",
+    "grip_zone": "handle", "active_tip": "sponge tip",
+    "common_mistakes": ["Cleaning inward toward the wound", "Skipping the surrounding margin"],
+    "model_path": null, "icon": "antiseptic",
+    "parts": []
+  },
+  {
+    "id": "sterile_drape", "name": "Sterile Drape", "frontend_label": "Drape", "category": "preparation",
+    "description": "Simulated fenestrated drape for field isolation.", "primary_use": "Isolating the simulated training area.",
+    "grip_zone": "corners", "active_tip": "fenestration",
+    "common_mistakes": ["Repositioning the drape after placement"],
+    "model_path": null, "icon": "drape",
+    "parts": []
+  },
+  {
+    "id": "needle_holder", "name": "Needle Holder", "frontend_label": "Needle holder", "category": "suturing",
+    "description": "Simulated ratcheted instrument that grips the curved needle.", "primary_use": "Driving the simulated curved needle along its arc.",
+    "grip_zone": "ring handles", "active_tip": "jaw",
+    "common_mistakes": ["Gripping the needle at its tip", "Palming without control", "Excessive wrist motion"],
+    "model_path": "/models/instruments/needle_holder.glb", "icon": "needle-holder",
+    "parts": [
+      { "part_id": "needle_holder_grip", "label": "Grip", "description": "Ring handles where fingers are placed.", "highlight_position": [0.0, 0.1, 0.0] },
+      { "part_id": "needle_holder_joint", "label": "Joint", "description": "The box-lock pivot of the simulated instrument.", "highlight_position": [0.05, 0.45, 0.0] },
+      { "part_id": "needle_holder_jaw", "label": "Jaw", "description": "Textured surfaces that hold the simulated needle.", "highlight_position": [0.1, 0.72, -0.02] },
+      { "part_id": "needle_holder_tip", "label": "Tip", "description": "The active gripping end of the simulated instrument.", "highlight_position": [0.12, 0.82, -0.05] }
+    ]
+  },
+  {
+    "id": "forceps", "name": "Tissue Forceps", "frontend_label": "Forceps", "category": "suturing",
+    "description": "Simulated toothed forceps for stabilizing tissue edges.", "primary_use": "Supporting the simulated tissue edge during needle passage.",
+    "grip_zone": "mid-shaft pencil grip", "active_tip": "toothed tip",
+    "common_mistakes": ["Crushing grip on the simulated tissue", "Holding like a fist"],
+    "model_path": "/models/instruments/forceps.glb", "icon": "forceps",
+    "parts": [
+      { "part_id": "forceps_grip", "label": "Grip", "description": "Serrated mid-shaft grip zone.", "highlight_position": [0.0, 0.4, 0.0] },
+      { "part_id": "forceps_tip", "label": "Tip", "description": "Fine toothed tip for simulated tissue handling.", "highlight_position": [0.0, 0.9, 0.0] }
+    ]
+  },
+  {
+    "id": "curved_needle", "name": "Curved Needle", "frontend_label": "Curved needle", "category": "suturing",
+    "description": "Simulated curved suturing needle.", "primary_use": "Passing simulated suture material through the training patch.",
+    "grip_zone": "proximal third", "active_tip": "point",
+    "common_mistakes": ["Loading at the wrong angle", "Pushing instead of rotating"],
+    "model_path": "/models/instruments/curved_needle.glb", "icon": "needle",
+    "parts": [
+      { "part_id": "curved_needle_body", "label": "Body", "description": "The curved body gripped by the needle holder.", "highlight_position": [0.0, 0.5, 0.0] },
+      { "part_id": "curved_needle_point", "label": "Point", "description": "The simulated entry point of the needle.", "highlight_position": [0.08, 0.85, 0.0] }
+    ]
+  },
+  {
+    "id": "suture_material", "name": "Suture Material", "frontend_label": "Suture", "category": "suturing",
+    "description": "Simulated suture thread attached to the curved needle.", "primary_use": "Simulated wound approximation and knot practice.",
+    "grip_zone": "free ends", "active_tip": "none",
+    "common_mistakes": ["Excess tension while pulling through"],
+    "model_path": null, "icon": "suture",
+    "parts": []
+  },
+  {
+    "id": "surgical_scissors", "name": "Surgical Scissors", "frontend_label": "Scissors", "category": "suturing",
+    "description": "Simulated suture scissors.", "primary_use": "Cutting simulated suture tails.",
+    "grip_zone": "ring handles", "active_tip": "blade tips",
+    "common_mistakes": ["Cutting tails too short", "Cutting without visualizing the knot"],
+    "model_path": "/models/instruments/scissors.glb", "icon": "scissors",
+    "parts": [
+      { "part_id": "scissors_grip", "label": "Grip", "description": "Ring handles for thumb and ring finger.", "highlight_position": [0.0, 0.1, 0.0] },
+      { "part_id": "scissors_tip", "label": "Tip", "description": "Blade tips used to cut the simulated suture.", "highlight_position": [0.05, 0.85, 0.0] }
+    ]
+  },
+  {
+    "id": "scalpel_trainer", "name": "Training Scalpel", "frontend_label": "Scalpel", "category": "training",
+    "description": "Blunt simulated scalpel for path-tracing exercises.", "primary_use": "Tracing marked paths on the training board.",
+    "grip_zone": "pencil grip", "active_tip": "blunt tip",
+    "common_mistakes": ["Inconsistent speed", "Lifting mid-path"],
+    "model_path": null, "icon": "scalpel",
+    "parts": []
+  },
+  {
+    "id": "grasper_left", "name": "Left Grasper", "frontend_label": "Left grasper", "category": "training",
+    "description": "Simulated laparoscopic-style grasper, left hand.", "primary_use": "Peg transfer coordination practice.",
+    "grip_zone": "scissor grip", "active_tip": "jaw",
+    "common_mistakes": ["Transferring too close to the board"],
+    "model_path": null, "icon": "grasper",
+    "parts": []
+  },
+  {
+    "id": "grasper_right", "name": "Right Grasper", "frontend_label": "Right grasper", "category": "training",
+    "description": "Simulated laparoscopic-style grasper, right hand.", "primary_use": "Peg transfer coordination practice.",
+    "grip_zone": "scissor grip", "active_tip": "jaw",
+    "common_mistakes": ["Rushing the handoff"],
+    "model_path": null, "icon": "grasper",
+    "parts": []
+  }
+]

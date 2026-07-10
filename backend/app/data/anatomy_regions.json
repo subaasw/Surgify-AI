@@ -1,0 +1,68 @@
+[
+  {
+    "id": "right_forearm",
+    "name": "Right Forearm",
+    "frontend_label": "Right arm",
+    "aliases": ["right arm", "right forearm", "right_arm"],
+    "selectable": true,
+    "structures": [
+      { "id": "forearm_skin", "name": "Skin", "category": "skin", "model_node_name": "forearm_skin", "description": "A simplified educational representation of the forearm skin layer.", "default_visible": true },
+      { "id": "forearm_muscle", "name": "Muscle Layer", "category": "muscle", "model_node_name": "forearm_muscle", "description": "A simplified educational representation of the forearm flexor muscle group.", "default_visible": false },
+      { "id": "radius", "name": "Radius", "category": "bone", "model_node_name": "forearm_radius", "description": "A simplified educational representation of the radius.", "default_visible": true },
+      { "id": "ulna", "name": "Ulna", "category": "bone", "model_node_name": "forearm_ulna", "description": "A simplified educational representation of the ulna.", "default_visible": true },
+      { "id": "forearm_vessel", "name": "Major Vessel Path", "category": "vessel", "model_node_name": "forearm_vessel", "description": "A simplified educational path representing major forearm vessels.", "default_visible": false },
+      { "id": "forearm_nerve", "name": "Nerve Path", "category": "nerve", "model_node_name": "forearm_nerve", "description": "A simplified educational path representing major forearm nerves.", "default_visible": false }
+    ]
+  },
+  {
+    "id": "left_forearm",
+    "name": "Left Forearm",
+    "frontend_label": "Left arm",
+    "aliases": ["left arm", "left forearm", "left_arm"],
+    "selectable": true,
+    "structures": [
+      { "id": "left_forearm_skin", "name": "Skin", "category": "skin", "model_node_name": "left_forearm_skin", "description": "A simplified educational representation of the forearm skin layer.", "default_visible": true }
+    ]
+  },
+  {
+    "id": "head",
+    "name": "Head",
+    "frontend_label": "Head",
+    "aliases": ["head"],
+    "selectable": true,
+    "structures": [
+      { "id": "head_skin", "name": "Skin", "category": "skin", "model_node_name": "head_skin", "description": "A simplified educational representation of the head surface.", "default_visible": true }
+    ]
+  },
+  {
+    "id": "chest",
+    "name": "Chest",
+    "frontend_label": "Chest",
+    "aliases": ["chest", "thorax"],
+    "selectable": true,
+    "structures": [
+      { "id": "chest_skin", "name": "Skin", "category": "skin", "model_node_name": "chest_skin", "description": "A simplified educational representation of the chest surface.", "default_visible": true },
+      { "id": "rib_cage", "name": "Rib Cage", "category": "bone", "model_node_name": "rib_cage", "description": "A simplified educational representation of the rib cage.", "default_visible": false }
+    ]
+  },
+  {
+    "id": "abdomen",
+    "name": "Abdomen",
+    "frontend_label": "Abdomen",
+    "aliases": ["abdomen", "belly"],
+    "selectable": true,
+    "structures": [
+      { "id": "abdomen_skin", "name": "Skin", "category": "skin", "model_node_name": "abdomen_skin", "description": "A simplified educational representation of the abdominal surface.", "default_visible": true }
+    ]
+  },
+  {
+    "id": "training_board",
+    "name": "Training Board",
+    "frontend_label": "Training board",
+    "aliases": ["training board", "board"],
+    "selectable": true,
+    "structures": [
+      { "id": "board_surface", "name": "Board Surface", "category": "training", "model_node_name": "board_surface", "description": "The simulated skills training board surface.", "default_visible": true }
+    ]
+  }
+]

@@ -1,0 +1,45 @@
+{
+  "id": "scenario_peg_transfer",
+  "slug": "peg-transfer",
+  "name": "Peg Transfer",
+  "short_description": "Build bimanual coordination through precise simulated object transfer.",
+  "full_description": "A short guided exercise: pick up simulated pegs with one grasper, transfer to the other hand, and place on target posts.",
+  "difficulty": "Beginner",
+  "estimated_minutes": 12,
+  "patient_id": "patient_training_board",
+  "objectives": ["Transfer pegs between graspers", "Place pegs on targets", "Minimize drops"],
+  "required_tools": ["grasper_left", "grasper_right"],
+  "body_regions": ["training_board"],
+  "scoring_weights": {
+    "patient_assessment": 0.0, "procedure_sequence": 0.15, "instrument_selection": 0.10,
+    "entry_accuracy": 0.10, "exit_accuracy": 0.10, "tool_stability": 0.20,
+    "motion_efficiency": 0.25, "safety": 0.05, "completion_time": 0.05
+  },
+  "is_available": true,
+  "steps": [
+    {
+      "id": "select_graspers", "order": 1, "phase": "instruments",
+      "title": "Select the graspers", "instruction": "Select a grasper to begin.",
+      "hint": "Either grasper can start.", "required_action": "select_tool",
+      "required_target": null, "required_tool": "grasper_right", "allowed_tools": ["grasper_left", "grasper_right"],
+      "completion_rule": { "type": "exact_action", "action": "select_tool" },
+      "score_value": 20, "safety_critical": false, "checklist_key": "instruments", "metric_category": "instrument_selection"
+    },
+    {
+      "id": "transfer_pegs", "order": 2, "phase": "suture",
+      "title": "Transfer the pegs", "instruction": "Pick up, transfer, and place each simulated peg.",
+      "hint": "Transfer at mid-height between posts.", "required_action": "advance_needle",
+      "required_target": "peg_targets", "required_tool": null, "allowed_tools": ["grasper_left", "grasper_right"],
+      "completion_rule": { "type": "exact_action", "action": "advance_needle" },
+      "score_value": 50, "safety_critical": false, "checklist_key": null, "metric_category": "motion_efficiency"
+    },
+    {
+      "id": "finish_peg_exercise", "order": 3, "phase": "complete",
+      "title": "Complete the exercise", "instruction": "Confirm completion to end the exercise.",
+      "hint": "All pegs should rest on target posts.", "required_action": "complete_step",
+      "required_target": null, "required_tool": null, "allowed_tools": [],
+      "completion_rule": { "type": "exact_action", "action": "complete_step" },
+      "score_value": 30, "safety_critical": false, "checklist_key": "complete", "metric_category": "procedure_sequence"
+    }
+  ]
+}

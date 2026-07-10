@@ -1,0 +1,22 @@
+{
+  "CORRECT_REGION": { "type": "success", "message": "Correct body region selected.", "priority": 3 },
+  "WRONG_REGION": { "type": "error", "message": "That is not the injured region. The patient reports pain in the right forearm.", "priority": 8 },
+  "STEP_COMPLETED": { "type": "success", "message": "Step completed. Moving to the next step.", "priority": 3 },
+  "OUT_OF_ORDER": { "type": "warning", "message": "That action is not expected yet. Follow the current step instruction.", "priority": 6 },
+  "ASSESSMENT_FIRST": { "type": "warning", "message": "Before beginning wound closure, complete the circulation and sensation checks.", "priority": 7 },
+  "TOOL_SELECTED": { "type": "success", "message": "Instrument selected.", "priority": 2 },
+  "NEEDLE_HOLDER_SELECTED": { "type": "success", "message": "Needle holder selected.", "priority": 3 },
+  "WRONG_TOOL": { "type": "warning", "message": "The current tool is not appropriate for this step.", "priority": 7 },
+  "MOVE_CLOSER": { "type": "hint", "message": "Move closer to the entry marker.", "priority": 5 },
+  "REDUCE_ANGLE": { "type": "hint", "message": "Reduce the instrument angle.", "priority": 5 },
+  "SMOOTHER_MOVEMENT": { "type": "success", "message": "Your movement is becoming smoother.", "priority": 3 },
+  "SAFETY_ZONE": { "type": "safety", "message": "Safety zone entered. Adjust the instrument path away from the marked zone.", "priority": 9 },
+  "FINAL_REASSESS": { "type": "instruction", "message": "Complete the final reassessment before ending the scenario.", "priority": 6 },
+  "SCENARIO_COMPLETE": { "type": "summary", "message": "Scenario complete. Review your performance report for detailed feedback.", "priority": 4 },
+  "HINT_USED": { "type": "hint", "message": "Hint provided. Small hint penalty applied to the educational score.", "priority": 4 },
+  "SESSION_STARTED": { "type": "instruction", "message": "Session started. Begin by reviewing the virtual patient information.", "priority": 4 },
+  "EVEN_TENSION": { "type": "hint", "message": "Keep suture tension steady and moderate.", "priority": 4 },
+  "KNOT_PROGRESS": { "type": "success", "message": "Knot throw registered. Continue the sequence.", "priority": 3 },
+  "STABILITY_LOW": { "type": "warning", "message": "Tool movement is unstable. Slow down and steady your grip.", "priority": 6 },
+  "ENTRY_GOOD": { "type": "success", "message": "Entry point placement looks accurate.", "priority": 3 }
+}
