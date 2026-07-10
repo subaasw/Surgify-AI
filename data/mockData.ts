@@ -128,6 +128,13 @@ export const anatomyLayers: AnatomyLayer[] = [
     relevance: "Landmark identification supports safe tool positioning in thoracic simulations.",
   },
   {
+    id: "brain",
+    name: "Brain",
+    color: "#d9a6a6",
+    description: "The brain is the central organ of the nervous system, protected by the skull.",
+    relevance: "Spatial inspection reinforces protected-zone awareness and neurological orientation.",
+  },
+  {
     id: "heart",
     name: "Heart",
     color: "#d63c53",
@@ -140,6 +147,13 @@ export const anatomyLayers: AnatomyLayer[] = [
     color: "#ea8f9c",
     description: "Paired lungs occupy most of the thoracic cavity on either side of the mediastinum.",
     relevance: "Layer toggles clarify how surface landmarks relate to protected structures.",
+  },
+  {
+    id: "kidney",
+    name: "Kidneys",
+    color: "#984d46",
+    description: "The paired kidneys lie behind the abdominal cavity on either side of the spine.",
+    relevance: "Posterior positioning and paired anatomy support regional orientation exercises.",
   },
   {
     id: "liver",

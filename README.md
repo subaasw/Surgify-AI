@@ -29,8 +29,15 @@ Next.js App Router, TypeScript, Tailwind CSS, React Three Fiber, Drei, Recharts,
 
 - `components/simulation/WebcamPractice.tsx` contains the optional live camera surface. Real hand/tool tracking can replace the simulated overlay there.
 - `components/simulation/SimulationProvider.tsx` owns the rule-based scenario, checklist, scoring, and coach state.
-- `components/simulation/HospitalScene.tsx` builds the complete room, patient, equipment, wound patch, and guided instrument scene procedurally.
-- `data/modelConfig.ts` is the central registry for future freely licensed GLB/GLTF assets; named procedural fallbacks remain the reliable offline default.
+- `components/simulation/HospitalScene.tsx` combines the procedural clinical room with the supplied textured patient and instrument assets while preserving reliable interaction hit zones.
+- `components/simulation/ModelRegistry.tsx` normalizes GLB/FBX scale, preserves authored textures, applies clinical materials to untextured meshes, and activates procedural fallbacks when an asset fails.
+- `data/modelConfig.ts` is the central registry for the patient, instrument, and organ assets in `public/3d`.
 - `data/mockData.ts` contains the local scenario, session, anatomy, and analytics datasets.
 
 All session, score, streak, and preference persistence in this prototype is device-local via `localStorage`.
+
+## 3D asset attribution
+
+- “Patient” by [edouard77](https://sketchfab.com/edouard77), licensed under [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). [Source model](https://sketchfab.com/3d-models/patient-00b483f284a542899b94e99831f1ad1c).
+- “Realistic Human Heart” by [neshallads](https://sketchfab.com/neshallads), licensed under [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). [Source model](https://sketchfab.com/3d-models/realistic-human-heart-3f8072336ce94d18b3d0d055a1ece089).
+- Remaining files in `public/3d` are project-supplied assets; confirm their source licenses before distribution outside the prototype.

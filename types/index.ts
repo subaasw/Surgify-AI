@@ -36,7 +36,7 @@ export type TrainingSession = {
 };
 
 export type AnatomyLayer = {
-  id: "skin" | "muscles" | "skeleton" | "heart" | "lungs" | "liver" | "stomach";
+  id: "skin" | "muscles" | "skeleton" | "brain" | "heart" | "lungs" | "kidney" | "liver" | "stomach";
   name: string;
   color: string;
   description: string;
