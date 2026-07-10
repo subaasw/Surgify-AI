@@ -49,3 +49,5 @@ brain/
 .cursor/
 .cursorrules
 .cline/
+
+dist/
