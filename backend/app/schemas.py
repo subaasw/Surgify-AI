@@ -274,6 +274,21 @@ class Point2D(BaseModel):
     y: float
 
 
+class Landmark3D(Point2D):
+    z: float
+
+
+class DetectedHand(BaseModel):
+    handedness: str
+    score: float = Field(ge=0, le=1)
+    gesture: str
+    gesture_score: float = Field(ge=0, le=1)
+    pinch: bool
+    pinch_distance: float = Field(ge=0)
+    pointer: Point2D
+    landmarks: list[Landmark3D]
+
+
 class DetectedTool(BaseModel):
     class_id: str
     confidence: float
@@ -287,7 +302,7 @@ class VisionFrameResult(BaseModel):
     processed: bool
     mode: str
     tracking_confidence: float
-    hands: list[dict[str, Any]] = []
+    hands: list[DetectedHand] = []
     tools: list[DetectedTool] = []
     metrics: dict[str, float] = {}
     warnings: list[str] = []

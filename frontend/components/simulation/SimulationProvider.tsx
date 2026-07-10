@@ -26,6 +26,7 @@ type SimulationContextValue = {
   completeStep: (id: string, message?: string) => void;
   selectRegion: (region: string) => void;
   selectTool: (tool: string) => void;
+  releaseTool: () => void;
   performAction: (action: string) => void;
   setCameraMode: (mode: CameraMode) => void;
   setPaused: (paused: boolean) => void;
@@ -74,6 +75,14 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     setState((current): SimulationState => ({ ...current, selectedTool: tool, feedback: [{ id: `${Date.now()}-tool`, tone: (tool === "Needle holder" || !current.completedSteps.includes("instruments") ? "info" : "warning") as CoachMessage["tone"], title: `${tool} active`, message: tool === "Needle holder" ? "Grip at the ring handles and keep the active tip in view." : `${tool} is ready in the active tool slot.`, timestamp: current.elapsedTime }, ...current.feedback].slice(0, 8) }));
     if (tool === "Needle holder") completeStep("instruments", "Correct primary instrument selected. Position it above the entry marker.");
   }, [completeStep]);
+
+  const releaseTool = useCallback(() => {
+    setState((current): SimulationState => ({
+      ...current,
+      selectedTool: null,
+      feedback: [{ id: `${Date.now()}-release`, tone: "info", title: "Tool released", message: "Open palm detected. The active instrument was returned to the tray.", timestamp: current.elapsedTime }, ...current.feedback].slice(0, 8),
+    }));
+  }, []);
 
   const performAction = useCallback((action: string) => {
     setState((current): SimulationState => {
@@ -126,13 +135,14 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     completeStep,
     selectRegion,
     selectTool,
+    releaseTool,
     performAction,
     setCameraMode: mode => setState(current => ({ ...current, cameraMode: mode })),
     setPaused: paused => setState(current => ({ ...current, paused })),
     resetSimulation: () => setState(initialState),
     toggleAnatomy: () => setState(current => ({ ...current, anatomyOverlay: !current.anatomyOverlay, cameraMode: !current.anatomyOverlay ? "anatomy" : "patient" })),
     toggleTracking: () => setState(current => ({ ...current, trackingOverlay: !current.trackingOverlay })),
-  }), [state, completeStep, selectRegion, selectTool, performAction]);
+  }), [state, completeStep, selectRegion, selectTool, releaseTool, performAction]);
 
   return <SimulationContext.Provider value={value}>{children}</SimulationContext.Provider>;
 }

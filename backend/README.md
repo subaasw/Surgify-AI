@@ -63,7 +63,8 @@ See `.env.example`. Highlights:
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///./surgify.db` | SQLite file — no database server needed |
 | `FRONTEND_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | CORS allowlist (no wildcard) |
-| `VISION_MODE` | `mock` | `mock` \| `opencv` \| `mediapipe` |
+| `VISION_MODE` | `mediapipe` | `mock` \| `opencv` \| `mediapipe` |
+| `MEDIAPIPE_MODEL_PATH` | `app/data/models/gesture_recognizer.task` | Google gesture task model |
 | `DEMO_MODE` | `true` | anonymous sessions, mock vision, no keys needed |
 | `ANTHROPIC_API_KEY` | empty | **not required** — coach is rule-based |
 
@@ -91,13 +92,16 @@ Adding scenarios: `docs/scenario-authoring.md`.
 
 ## Vision modes
 
-- `mock` (default): deterministic pseudo-detections — demo-safe, zero dependencies.
-- `opencv`: ArUco-marker + HSV color-marker tool-tip detection (`uv sync --extra vision`).
+- `mediapipe` (default): Google MediaPipe landmarks, handedness, canned gestures,
+  index-finger pointer coordinates, and pinch detection.
+- `mock`: deterministic pseudo-detections for environments without camera processing.
+- `opencv`: ArUco-marker + HSV color-marker tool-tip detection.
   Missing markers degrade to low confidence + warning, never a crash.
-- `mediapipe`: hand landmarks if `mediapipe` is installed; otherwise falls back to mock
-  with a warning.
 
-Target frame upload rate: 2–5 fps (`POST /api/v1/vision/frame`, JPEG/PNG multipart, ≤5 MB).
+The bundled model is stored at `app/data/models/gesture_recognizer.task`; override it
+with `MEDIAPIPE_MODEL_PATH` when using a compatible custom model.
+
+Target frame upload rate: 4–6 fps (`POST /api/v1/vision/frame`, JPEG/PNG multipart, ≤5 MB).
 
 ## Demo workflow
 
@@ -122,7 +126,8 @@ Target frame upload rate: 2–5 fps (`POST /api/v1/vision/frame`, JPEG/PNG multi
 
 - No authentication (anonymous sessions; `user_id` is nullable by design).
 - No Alembic migrations — `create_all` + seed script only.
-- Vision `opencv`/`mediapipe` modes need markers/lighting; `mock` is the demo path.
+- MediaPipe recognition depends on clear lighting and an unobstructed hand view; mouse
+  controls remain available when camera tracking is unavailable.
 - Vitals are cosmetic drift, not a physiological model.
 - Elapsed time is client-reported (`elapsed_ms`), clamped server-side but trusted.
 - One process; WebSocket fan-out is in-memory (no Redis), so run a single instance.

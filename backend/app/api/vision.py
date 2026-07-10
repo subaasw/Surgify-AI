@@ -1,4 +1,5 @@
 from fastapi import APIRouter, File, Form, UploadFile
+from starlette.concurrency import run_in_threadpool
 
 from ..config import get_settings
 from ..schemas import VisionFrameResult
@@ -27,7 +28,7 @@ async def process_frame(
         raise ApiError(400, "EMPTY_FRAME", "The uploaded frame is empty.")
     if mode and mode not in ("mock", "opencv", "mediapipe"):
         raise ApiError(400, "UNKNOWN_VISION_MODE", f"Unknown vision mode '{mode}'.")
-    return get_adapter(mode).process(data, session_id)
+    return await run_in_threadpool(get_adapter(mode).process, data, session_id)
 
 
 @router.get("/vision/modes")

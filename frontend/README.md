@@ -27,7 +27,7 @@ Next.js App Router, TypeScript, Tailwind CSS, React Three Fiber, Drei, Recharts,
 
 ## Prototype integration points
 
-- `components/simulation/WebcamPractice.tsx` contains the optional live camera surface. Real hand/tool tracking can replace the simulated overlay there.
+- `components/simulation/WebcamPractice.tsx` streams sampled camera frames to the local FastAPI MediaPipe pipeline and maps stable hand gestures to simulator actions.
 - `components/simulation/SimulationProvider.tsx` owns the rule-based scenario, checklist, scoring, and coach state.
 - `components/simulation/HospitalScene.tsx` builds the complete room, patient, equipment, wound patch, and guided instrument scene procedurally.
 - `data/modelConfig.ts` is the central registry for future freely licensed GLB/GLTF assets; named procedural fallbacks remain the reliable offline default.

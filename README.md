@@ -42,6 +42,8 @@ Run the backend end-to-end check with `make smoke`.
 ## Frontend integration points
 
 - `frontend/components/simulation/WebcamPractice.tsx` contains the optional live camera surface.
+- Webcam practice sends sampled frames to the FastAPI MediaPipe pipeline; stable hand
+  gestures select the forearm, pick/release instruments, and advance scenario actions.
 - `frontend/components/simulation/SimulationProvider.tsx` owns the rule-based scenario, checklist, scoring, and coach state.
 - `frontend/components/simulation/HospitalScene.tsx` combines the procedural clinical room with the supplied textured patient and instrument assets.
 - `frontend/components/simulation/ModelRegistry.tsx` normalizes GLB/FBX scale, preserves authored textures, applies clinical materials, and activates procedural fallbacks.

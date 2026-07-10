@@ -247,13 +247,30 @@ export interface SimulationResult {
 
 // ---------- vision ----------
 
+export interface HandLandmark {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface DetectedHand {
+  handedness: string;
+  score: number;
+  gesture: string;
+  gesture_score: number;
+  pinch: boolean;
+  pinch_distance: number;
+  pointer: { x: number; y: number };
+  landmarks: HandLandmark[];
+}
+
 export interface VisionFrameResult {
   frame_id: string;
   session_id: string | null;
   processed: boolean;
   mode: "mock" | "opencv" | "mediapipe";
   tracking_confidence: number;
-  hands: unknown[];
+  hands: DetectedHand[];
   tools: {
     class_id: string;
     confidence: number;

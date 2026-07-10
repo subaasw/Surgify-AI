@@ -43,7 +43,7 @@ Frontend procedure phases map to `ScenarioStep.phase`:
 | POST/GET | `/sessions/{id}/trajectory` | batch store / replay tool trajectory |
 | GET | `/sessions/{id}/results` | result for one session |
 | GET | `/results` · `/results/{id}` | results history |
-| POST | `/vision/frame` | webcam frame analysis (multipart) |
+| POST | `/vision/frame` | MediaPipe webcam hand/gesture analysis (multipart) |
 
 ## Usage examples
 
@@ -77,6 +77,11 @@ form.append("frame", jpegBlob, "frame.jpg");
 form.append("session_id", created.session.id);
 const vision: VisionFrameResult = await fetch(`${API}/vision/frame`, { method: "POST", body: form })
   .then(r => r.json());
+
+// MediaPipe hands contain 21 normalized landmarks, handedness, the index-finger
+// pointer, canned gesture name/score, and a derived thumb/index pinch state.
+const primaryHand = vision.hands[0];
+if (primaryHand?.pinch) pickNearestTool(primaryHand.pointer);
 
 // 5. complete + load results
 await fetch(`${API}/sessions/${created.session.id}/complete`, { method: "POST" });
