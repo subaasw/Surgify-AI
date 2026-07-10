@@ -41,3 +41,11 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# AI Agents
+.gemini/
+.openai/
+brain/
+.cursor/
+.cursorrules
+.cline/
