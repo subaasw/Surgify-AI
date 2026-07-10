@@ -28,28 +28,146 @@ export function AnatomyViewer() {
 
   return (
     <div className="anatomy-layout">
+      {/* ── Left sidebar: layer controls ── */}
       <aside className="anatomy-controls panel">
-        <div className="anatomy-panel-head"><div><p className="eyebrow">Visibility</p><h2>Anatomy layers</h2></div><Layers3 size={18} /></div>
+        <div className="anatomy-panel-head">
+          <div>
+            <p className="eyebrow">Visibility</p>
+            <h2>Anatomy layers</h2>
+          </div>
+          <Layers3 size={18} />
+        </div>
+
         <div className="body-regions" role="group" aria-label="Body region">
-          {["Head", "Thorax", "Abdomen", "Upper limb", "Lower limb"].map(item => <button key={item} onClick={() => setRegion(item)} className={region === item ? "active" : ""}>{item}</button>)}
+          {["Head", "Thorax", "Abdomen", "Upper limb", "Lower limb"].map(item => (
+            <button
+              key={item}
+              onClick={() => setRegion(item)}
+              className={region === item ? "active" : ""}
+            >
+              {item}
+            </button>
+          ))}
         </div>
+
         <div className="layer-list">
-          {anatomyLayers.map(layer => <div key={layer.id} className={cn("layer-row", selected === layer.id && "selected")}><button className="layer-main" onClick={() => { setSelected(layer.id); if (!visible[layer.id]) toggleLayer(layer.id); }}><i style={{ background: layer.color }} /><span><strong>{layer.name}</strong><small>{layer.id === "skin" || layer.id === "muscles" || layer.id === "skeleton" ? "Tissue layer" : "Internal structure"}</small></span></button><button className="layer-visibility" onClick={() => toggleLayer(layer.id)} aria-label={`${visible[layer.id] ? "Hide" : "Show"} ${layer.name}`}>{visible[layer.id] ? <Eye size={14} /> : <EyeOff size={14} />}</button></div>)}
+          {anatomyLayers.map(layer => (
+            <div key={layer.id} className={cn("layer-row", selected === layer.id && "selected")}>
+              <button
+                className="layer-main"
+                onClick={() => { setSelected(layer.id); if (!visible[layer.id]) toggleLayer(layer.id); }}
+              >
+                <i style={{ background: layer.color }} />
+                <span>
+                  <strong>{layer.name}</strong>
+                  <small>{layer.id === "skin" || layer.id === "muscles" || layer.id === "skeleton" ? "Tissue layer" : "Internal structure"}</small>
+                </span>
+              </button>
+              <button
+                className="layer-visibility"
+                onClick={() => toggleLayer(layer.id)}
+                aria-label={`${visible[layer.id] ? "Hide" : "Show"} ${layer.name}`}
+              >
+                {visible[layer.id] ? <Eye size={14} /> : <EyeOff size={14} />}
+              </button>
+            </div>
+          ))}
         </div>
-        <div className="exploded-control"><div><span>Exploded view</span><strong>{exploded}%</strong></div><input aria-label="Exploded view" type="range" min="0" max="100" value={exploded} onChange={e => setExploded(Number(e.target.value))} /></div>
+
+        <div className="exploded-control">
+          <div>
+            <span>Exploded view</span>
+            <strong>{exploded}%</strong>
+          </div>
+          <input
+            aria-label="Exploded view"
+            type="range"
+            min="0"
+            max="100"
+            value={exploded}
+            onChange={e => setExploded(Number(e.target.value))}
+          />
+        </div>
       </aside>
 
+      {/* ── Center: 3D canvas stage ── */}
       <section className="anatomy-stage panel">
-        <div className="anatomy-stage-top"><div><span className="stage-status"><i /> Interactive 3D</span><b>{region} focus</b></div><div><button className={wireframe ? "active" : ""} onClick={() => setWireframe(!wireframe)}><ScanLine size={14} />Wireframe</button><button className={transparent ? "active" : ""} onClick={() => setTransparent(!transparent)}><Focus size={14} />Transparency</button><button className={labels ? "active" : ""} onClick={() => setLabels(!labels)}><Layers3 size={14} />Labels</button><button onClick={() => setCameraKey(k => k + 1)} aria-label="Reset anatomy view"><RotateCcw size={14} /></button></div></div>
-        <div className="anatomy-canvas"><SceneErrorBoundary><Canvas camera={{ position: [0, 0.15, 6.4], fov: 40 }} dpr={[1, 1.6]}><color attach="background" args={["#08131f"]} /><fog attach="fog" args={["#08131f", 7, 13]} /><ambientLight intensity={1.15} /><directionalLight position={[4, 6, 5]} intensity={2.4} color="#d9f8ff" /><directionalLight position={[-4, -2, 3]} intensity={1.2} color="#2979c7" /><Suspense fallback={<Html center><span className="canvas-loader">Loading anatomy…</span></Html>}><Float speed={.65} rotationIntensity={.05} floatIntensity={.08}><ProceduralTorso visible={visible} selected={selected} exploded={exploded} wireframe={wireframe} transparent={transparent} labels={labels} onSelect={setSelected} /></Float><Environment preset="city" environmentIntensity={.35} /></Suspense><OrbitControls key={cameraKey} enablePan={false} minDistance={3.8} maxDistance={9} minPolarAngle={.4} maxPolarAngle={2.7} /></Canvas></SceneErrorBoundary></div>
-        <div className="anatomy-stage-bottom"><span>Drag to rotate</span><i /> <span>Scroll to zoom</span><i /> <span>Select structures to inspect</span></div>
+        <div className="anatomy-stage-top">
+          <div>
+            <span className="stage-status"><i />Interactive 3D</span>
+            <b>{region} focus</b>
+          </div>
+          <div>
+            <button className={wireframe ? "active" : ""} onClick={() => setWireframe(!wireframe)}>
+              <ScanLine size={14} />Wireframe
+            </button>
+            <button className={transparent ? "active" : ""} onClick={() => setTransparent(!transparent)}>
+              <Focus size={14} />Transparency
+            </button>
+            <button className={labels ? "active" : ""} onClick={() => setLabels(!labels)}>
+              <Layers3 size={14} />Labels
+            </button>
+            <button onClick={() => setCameraKey(k => k + 1)} aria-label="Reset anatomy view">
+              <RotateCcw size={14} />
+            </button>
+          </div>
+        </div>
+
+        <div className="anatomy-canvas">
+          <SceneErrorBoundary>
+            <Canvas camera={{ position: [0, 0.15, 6.4], fov: 40 }} dpr={[1, 1.6]}>
+              <color attach="background" args={["#08131f"]} />
+              <fog attach="fog" args={["#08131f", 7, 13]} />
+              <ambientLight intensity={1.15} />
+              <directionalLight position={[4, 6, 5]} intensity={2.4} color="#d9f8ff" />
+              <directionalLight position={[-4, -2, 3]} intensity={1.2} color="#2979c7" />
+              <Suspense fallback={<Html center><span className="canvas-loader">Loading anatomy…</span></Html>}>
+                <Float speed={.65} rotationIntensity={.05} floatIntensity={.08}>
+                  <ProceduralTorso visible={visible} selected={selected} exploded={exploded} wireframe={wireframe} transparent={transparent} labels={labels} onSelect={setSelected} />
+                </Float>
+                <Environment preset="city" environmentIntensity={.35} />
+              </Suspense>
+              <OrbitControls key={cameraKey} enablePan={false} minDistance={3.8} maxDistance={9} minPolarAngle={.4} maxPolarAngle={2.7} />
+            </Canvas>
+          </SceneErrorBoundary>
+        </div>
+
+        <div className="anatomy-stage-bottom">
+          <span>Drag to rotate</span>
+          <i />
+          <span>Scroll to zoom</span>
+          <i />
+          <span>Select structures to inspect</span>
+        </div>
       </section>
 
+      {/* ── Right sidebar: structure details ── */}
       <aside className="structure-info panel">
-        <div className="structure-color" style={{ background: `linear-gradient(135deg, ${selectedLayer.color}33, transparent)` }}><span style={{ background: selectedLayer.color }} /><BadgeLabel text="Selected structure" /></div>
-        <p className="eyebrow">Structure overview</p><h2>{selectedLayer.name}</h2><p>{selectedLayer.description}</p>
-        <div className="structure-facts"><div><span>Region</span><strong>{selected === "brain" ? "Head" : ["skin","muscles","skeleton","heart","lungs"].includes(selected) ? "Thorax" : "Abdomen"}</strong></div><div><span>System</span><strong>{selected === "heart" ? "Cardiovascular" : selected === "lungs" ? "Respiratory" : selected === "brain" ? "Nervous" : selected === "kidney" ? "Urinary" : selected === "skeleton" ? "Skeletal" : selected === "muscles" ? "Muscular" : selected === "skin" ? "Integumentary" : "Digestive"}</strong></div></div>
-        <div className="training-relevance"><span><Focus size={14} />Training relevance</span><p>{selectedLayer.relevance}</p></div>
+        <div className="structure-color" style={{ background: `linear-gradient(135deg, ${selectedLayer.color}33, transparent)` }}>
+          <span style={{ background: selectedLayer.color }} />
+          <BadgeLabel text="Selected structure" />
+        </div>
+
+        <p className="eyebrow">Structure overview</p>
+        <h2>{selectedLayer.name}</h2>
+        <p>{selectedLayer.description}</p>
+
+        <div className="structure-facts">
+            <div>
+              <span>Region</span>
+              <strong>{selected === "brain" ? "Head" : ["skin","muscles","skeleton","heart","lungs"].includes(selected) ? "Thorax" : "Abdomen"}</strong>
+            </div>
+            <div>
+              <span>System</span>
+              <strong>{selected === "heart" ? "Cardiovascular" : selected === "lungs" ? "Respiratory" : selected === "brain" ? "Nervous" : selected === "kidney" ? "Urinary" : selected === "skeleton" ? "Skeletal" : selected === "muscles" ? "Muscular" : selected === "skin" ? "Integumentary" : "Digestive"}</strong>
+            </div>
+          </div>
+
+          <div className="training-relevance">
+            <span><Focus size={14} />Training relevance</span>
+            <p>{selectedLayer.relevance}</p>
+          </div>
+
         <Button variant="secondary" onClick={() => setSelected(selected === "skin" ? "heart" : "skin")}>Highlight related structure</Button>
         <p className="education-note">Educational visualization only. Not intended for diagnosis or real-patient procedure planning.</p>
       </aside>

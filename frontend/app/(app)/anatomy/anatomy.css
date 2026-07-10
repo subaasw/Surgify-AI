@@ -1,6 +1,1229 @@
-.anatomy-layout{display:grid;grid-template-columns:220px minmax(430px,1fr) 235px;gap:12px;min-height:650px}.anatomy-controls,.structure-info{padding:16px}.anatomy-panel-head{display:flex;align-items:flex-start;justify-content:space-between}.anatomy-panel-head .eyebrow{font-size:.48rem;margin-bottom:4px}.anatomy-panel-head h2{font-size:.92rem;margin:0}.anatomy-panel-head svg{color:#58dce7}.body-regions{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:14px 0}.body-regions button{height:29px;border:1px solid rgba(148,163,184,.13);background:rgba(7,17,31,.5);border-radius:7px;color:#667b91;font-size:.5rem;cursor:pointer}.body-regions button.active{background:rgba(41,199,216,.1);border-color:rgba(41,199,216,.28);color:#77e1ea}.layer-list{border-top:1px solid rgba(148,163,184,.1);padding-top:7px}.layer-row{height:48px;display:flex;align-items:center;border-radius:8px;border:1px solid transparent}.layer-row:hover,.layer-row.selected{background:rgba(41,199,216,.045)}.layer-row.selected{border-color:rgba(41,199,216,.11)}.layer-main{display:flex;align-items:center;gap:8px;flex:1;background:none;border:0;color:#94a6b8;text-align:left;cursor:pointer;padding:5px}.layer-main>i{width:9px;height:9px;border-radius:3px;box-shadow:0 0 8px currentColor}.layer-main span strong,.layer-main span small{display:block}.layer-main span strong{font-size:.58rem;color:#cedae3}.layer-main span small{font-size:.43rem;color:#5e7288;margin-top:2px}.layer-visibility{width:28px;height:28px;display:grid;place-items:center;background:none;border:0;color:#5f748a;cursor:pointer}.exploded-control{margin-top:15px;padding-top:14px;border-top:1px solid rgba(148,163,184,.1)}.exploded-control>div{display:flex;justify-content:space-between;font-size:.51rem;color:#6d8197;margin-bottom:7px}.exploded-control>div strong{color:#74e2ea}.exploded-control input{width:100%;accent-color:#29c7d8}.anatomy-stage{overflow:hidden;min-width:0}.anatomy-stage-top{height:46px;padding:0 11px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}.anatomy-stage-top>div{display:flex;align-items:center;gap:7px}.stage-status{display:flex;align-items:center;gap:5px;font-size:.49rem;color:#73dbab}.stage-status i{width:5px;height:5px;border-radius:50%;background:#35d27b}.anatomy-stage-top b{font-size:.5rem;color:#657a91;font-weight:500;border-left:1px solid var(--border);padding-left:7px}.anatomy-stage-top button,.instrument-stage-toolbar button{height:28px;display:inline-flex;align-items:center;gap:4px;border:1px solid rgba(148,163,184,.13);background:rgba(7,17,31,.45);color:#65798f;font-size:.46rem;padding:0 7px;cursor:pointer}.anatomy-stage-top button:first-child,.instrument-stage-toolbar button:first-child{border-radius:7px 0 0 7px}.anatomy-stage-top button:last-child,.instrument-stage-toolbar button:last-child{border-radius:0 7px 7px 0}.anatomy-stage-top button.active,.instrument-stage-toolbar button.active{color:#71dfe8;background:rgba(41,199,216,.08);border-color:rgba(41,199,216,.22)}.anatomy-canvas{height:555px;background:radial-gradient(circle at 50% 45%,rgba(41,199,216,.1),transparent 45%),#08131f}.anatomy-label{display:block;white-space:nowrap;font-size:8px;color:#d7faff;background:rgba(4,14,24,.8);border:1px solid rgba(81,216,227,.3);padding:3px 5px;border-radius:4px;pointer-events:none}.canvas-loader{font-size:.65rem;color:#6d849b}.anatomy-stage-bottom{height:45px;display:flex;align-items:center;justify-content:center;gap:9px;color:#5d7288;font-size:.46rem;border-top:1px solid var(--border)}.anatomy-stage-bottom i{width:3px;height:3px;border-radius:50%;background:#344a60}.structure-color{height:90px;border-radius:10px;position:relative;margin-bottom:16px;border:1px solid rgba(148,163,184,.11);display:grid;place-items:center}.structure-color>span{width:38px;height:48px;border-radius:18px 18px 12px 12px;box-shadow:0 0 30px currentColor}.structure-color>small{position:absolute;left:8px;top:8px;font-size:.42rem;color:#879aac;background:rgba(7,17,31,.6);padding:4px 6px;border-radius:5px}.structure-info>.eyebrow{font-size:.47rem;margin-bottom:4px}.structure-info h2{font-size:1.1rem;margin-bottom:8px}.structure-info>p:not(.eyebrow):not(.education-note){font-size:.59rem;color:#8194a9;line-height:1.65}.structure-facts{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:13px 0}.structure-facts>div{padding:9px;background:rgba(7,17,31,.45);border:1px solid rgba(148,163,184,.1);border-radius:8px}.structure-facts span,.structure-facts strong{display:block}.structure-facts span{font-size:.41rem;color:#5d7289}.structure-facts strong{font-size:.53rem;margin-top:3px}.training-relevance{padding:11px;border-left:2px solid #29c7d8;background:rgba(41,199,216,.05);border-radius:0 8px 8px 0;margin:14px 0}.training-relevance>span{display:flex;align-items:center;gap:5px;color:#65dce6;font-size:.51rem;font-weight:650}.training-relevance p{font-size:.5rem!important;line-height:1.55!important;margin:6px 0 0;color:#7590a6!important}.structure-info>.button{width:100%;font-size:.53rem}.education-note{font-size:.43rem!important;color:#52677e!important;line-height:1.5!important;margin:13px 0 0}.instrument-section{margin-top:60px}.instrument-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:17px}.instrument-head h2{font-size:1.8rem;margin:0 0 7px}.instrument-head>div>p:last-child{font-size:.7rem;color:#8095aa;margin:0}.instrument-layout{display:grid;grid-template-columns:220px minmax(400px,1fr) 235px;gap:12px;min-height:500px}.instrument-list{display:flex;flex-direction:column;gap:7px}.instrument-list>button{min-height:80px;display:flex;align-items:center;gap:10px;text-align:left;padding:9px;border:1px solid var(--border);background:linear-gradient(145deg,rgba(19,36,56,.6),rgba(9,22,36,.9));border-radius:11px;color:#889caf;cursor:pointer}.instrument-list>button.active{border-color:rgba(41,199,216,.34);background:linear-gradient(145deg,rgba(41,199,216,.09),rgba(9,22,36,.9))}.instrument-list button>div{flex:1}.instrument-list strong,.instrument-list small{display:block}.instrument-list strong{font-size:.62rem;color:#d6e2ea}.instrument-list small{font-size:.46rem;line-height:1.4;margin-top:4px;color:#65798f}.instrument-thumb{width:49px;height:55px;flex:0 0 auto;position:relative;background:radial-gradient(circle,rgba(41,199,216,.1),transparent 70%);border-radius:8px}.instrument-thumb i,.instrument-thumb b{position:absolute;background:#a9b8bf}.instrument-thumb i{width:4px;height:45px;left:20px;top:5px;transform:rotate(-22deg)}.instrument-thumb b{width:4px;height:45px;right:18px;top:5px;transform:rotate(22deg)}.instrument-thumb.needle i{width:34px;height:34px;border:4px solid #a9b8bf;border-left-color:transparent;border-bottom-color:transparent;border-radius:50%;background:none;left:8px;top:11px}.instrument-thumb.needle b{display:none}.instrument-thumb.forceps i,.instrument-thumb.forceps b{transform:rotate(-5deg)}.instrument-thumb.forceps b{transform:rotate(5deg)}.instrument-stage{overflow:hidden;position:relative}.instrument-stage-toolbar{position:absolute;z-index:4;left:0;right:0;top:0;height:43px;display:flex;align-items:center;justify-content:space-between;padding:0 10px;border-bottom:1px solid var(--border);background:rgba(8,21,34,.86)}.instrument-stage-toolbar>span{font-size:.52rem;color:#8296aa}.instrument-stage{height:500px}.instrument-stage canvas{height:100%!important}.instrument-part-tabs{position:absolute;z-index:4;bottom:13px;left:50%;transform:translateX(-50%);display:flex;padding:3px;border:1px solid var(--border);border-radius:8px;background:rgba(7,17,31,.85)}.instrument-part-tabs button{border:0;background:none;color:#61768c;padding:7px 9px;font-size:.46rem;cursor:pointer;border-radius:5px;white-space:nowrap}.instrument-part-tabs button.active{color:#72e1ea;background:rgba(41,199,216,.1)}.instrument-info{padding:17px}.instrument-info>.eyebrow{font-size:.46rem;margin-bottom:4px}.instrument-info h3{font-size:1.05rem;margin-bottom:18px}.instrument-info dl{margin:0}.instrument-info dl>div{padding:10px 0;border-bottom:1px solid rgba(148,163,184,.1)}.instrument-info dt{font-size:.43rem;color:#60758b;text-transform:uppercase;letter-spacing:.07em}.instrument-info dd{margin:4px 0 0;font-size:.55rem;line-height:1.45;color:#c1ced9}.selected-part{margin-top:15px;padding:11px;border-radius:9px;background:rgba(41,199,216,.05);border:1px solid rgba(41,199,216,.12)}.selected-part span,.selected-part strong{display:block}.selected-part span{font-size:.43rem;color:#5e748a}.selected-part strong{font-size:.62rem;color:#62dce7;margin:4px 0}.selected-part p{font-size:.48rem;line-height:1.5;color:#70859b;margin:0}
-@media(max-width:1250px){.anatomy-layout{grid-template-columns:210px 1fr}.structure-info{grid-column:1/-1;display:grid;grid-template-columns:160px 1fr 1fr;gap:15px;align-items:start}.structure-color{grid-row:1/4}.structure-info>.eyebrow,.structure-info>h2{grid-column:2}.structure-info>p{grid-column:2}.structure-facts,.training-relevance{grid-column:3}.structure-info>.button{grid-column:3}.education-note{grid-column:2/4!important}.instrument-layout{grid-template-columns:190px 1fr}.instrument-info{grid-column:1/-1}}
-@media(max-width:850px){.anatomy-layout{grid-template-columns:1fr}.anatomy-controls{order:2}.anatomy-stage{order:1}.structure-info{order:3;grid-template-columns:1fr}.structure-color{grid-row:auto}.structure-info>.eyebrow,.structure-info>h2,.structure-info>p,.structure-facts,.training-relevance,.structure-info>.button,.education-note{grid-column:auto!important}.layer-list{display:grid;grid-template-columns:1fr 1fr}.instrument-layout{grid-template-columns:1fr}.instrument-list{display:grid;grid-template-columns:1fr 1fr}.instrument-stage{height:430px}.instrument-head{align-items:flex-start;flex-direction:column;gap:12px}}
-@media(max-width:600px){.anatomy-canvas{height:470px}.anatomy-stage-top>div:last-child button{font-size:0;padding:0 7px}.anatomy-stage-bottom{gap:5px}.layer-list,.instrument-list{grid-template-columns:1fr}.instrument-head h2{font-size:1.45rem}}
-.scene-fallback{height:100%;min-height:300px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#e8ad4f;gap:7px;padding:25px}.scene-fallback strong{font-size:.72rem;color:#dbe6ee}.scene-fallback span{max-width:280px;font-size:.52rem;line-height:1.5;color:#6d8298}
-.anatomy-app-status,.anatomy-app-mode{height:27px;display:flex;align-items:center;gap:5px;padding:0 8px;border:1px solid var(--border);background:#102131;border-radius:5px;color:#73899b;font-size:.42rem}.anatomy-app-status i{width:5px;height:5px;border-radius:50%;background:#42c279}.anatomy-app-page .app-page-content{height:calc(100vh - 58px);overflow:hidden}.anatomy-app-page .anatomy-layout{height:100%;min-height:0;gap:8px}.anatomy-app-page .anatomy-canvas{height:calc(100vh - 149px)}.anatomy-app-page .panel{border-radius:8px}
+/* =============================================
+   ANATOMY PAGE — Premium Medical/Scientific UI
+   ============================================= */
+
+/* ---------- Keyframes ---------- */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 24px currentColor, 0 0 48px currentColor;
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 36px currentColor, 0 0 64px currentColor;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes float-status {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes color-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* ===================================
+   LAYOUT — 3-Column Grid
+   =================================== */
+
+.anatomy-layout {
+  display: grid;
+  grid-template-columns: 224px minmax(430px, 1fr) 240px;
+  gap: 14px;
+  min-height: 650px;
+  animation: fadeIn 0.45s ease both;
+}
+
+/* ===================================
+   LEFT SIDEBAR — Anatomy Controls
+   =================================== */
+
+.anatomy-controls {
+  padding: 18px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 14px 35px rgba(0, 0, 0, 0.22);
+  overflow-y: auto;
+}
+
+.anatomy-controls::-webkit-scrollbar {
+  width: 4px;
+}
+
+.anatomy-controls::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.anatomy-controls::-webkit-scrollbar-thumb {
+  background: rgba(54, 184, 200, 0.2);
+  border-radius: 4px;
+}
+
+/* Panel Header */
+
+.anatomy-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.anatomy-panel-head .eyebrow {
+  font-size: 0.48rem;
+  margin-bottom: 4px;
+}
+
+.anatomy-panel-head h2 {
+  font-size: 0.92rem;
+  margin: 0;
+}
+
+.anatomy-panel-head svg {
+  color: var(--cyan-bright);
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+.anatomy-panel-head:hover svg {
+  opacity: 1;
+}
+
+/* ---------- Body Region Pill Buttons ---------- */
+
+.body-regions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 14px 0;
+}
+
+.body-regions button {
+  height: 32px;
+  border: 1px solid rgba(148, 163, 184, 0.13);
+  background: rgba(7, 17, 31, 0.55);
+  border-radius: 20px;
+  color: var(--muted);
+  font-size: 0.5rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  letter-spacing: 0.02em;
+}
+
+.body-regions button:hover {
+  background: rgba(41, 199, 216, 0.06);
+  border-color: rgba(41, 199, 216, 0.18);
+  color: var(--cyan-bright);
+}
+
+.body-regions button.active {
+  background: linear-gradient(135deg, rgba(41, 199, 216, 0.16), rgba(54, 184, 200, 0.08));
+  border-color: rgba(41, 199, 216, 0.32);
+  color: var(--cyan-bright);
+  box-shadow: 0 0 14px rgba(41, 199, 216, 0.1);
+}
+
+/* ---------- Layer List ---------- */
+
+.layer-list {
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.layer-row {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  border-left: 3px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.layer-row:hover {
+  background: rgba(41, 199, 216, 0.04);
+  border-color: rgba(41, 199, 216, 0.06);
+  border-left-color: rgba(41, 199, 216, 0.15);
+}
+
+.layer-row.selected {
+  background: rgba(41, 199, 216, 0.06);
+  border-color: rgba(41, 199, 216, 0.11);
+  border-left-color: var(--cyan);
+}
+
+.layer-main {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  background: none;
+  border: 0;
+  color: #94a6b8;
+  text-align: left;
+  cursor: pointer;
+  padding: 6px 8px;
+  transition: color 0.2s ease;
+}
+
+.layer-main:hover {
+  color: var(--text);
+}
+
+.layer-main > i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  box-shadow: 0 0 10px currentColor, 0 0 4px currentColor;
+  transition: box-shadow 0.3s ease;
+}
+
+.layer-row.selected .layer-main > i {
+  box-shadow: 0 0 14px currentColor, 0 0 6px currentColor;
+}
+
+.layer-main span strong,
+.layer-main span small {
+  display: block;
+}
+
+.layer-main span strong {
+  font-size: 0.72rem;
+  color: #cedae3;
+  font-weight: 550;
+  transition: color 0.2s ease;
+}
+
+.layer-row.selected .layer-main span strong {
+  color: var(--text);
+}
+
+.layer-main span small {
+  font-size: 0.52rem;
+  color: #5e7288;
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.layer-visibility {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: 0;
+  color: #5f748a;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.layer-visibility:hover {
+  color: var(--cyan);
+  background: rgba(41, 199, 216, 0.06);
+}
+
+/* ---------- Exploded View Slider ---------- */
+
+.exploded-control {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.exploded-control > div {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.51rem;
+  color: #6d8197;
+  margin-bottom: 8px;
+}
+
+.exploded-control > div strong {
+  color: var(--cyan-bright);
+  font-weight: 600;
+}
+
+/* Custom Range Slider — WebKit */
+
+.exploded-control input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: rgba(18, 34, 53, 0.9);
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+  margin: 4px 0;
+}
+
+.exploded-control input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--cyan) 0%,
+    rgba(18, 34, 53, 0.9) 0%
+  );
+}
+
+.exploded-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--cyan-bright), var(--cyan));
+  border: 2px solid rgba(7, 16, 27, 0.8);
+  box-shadow: 0 0 10px rgba(41, 199, 216, 0.35), 0 2px 6px rgba(0, 0, 0, 0.3);
+  margin-top: -6px;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease;
+}
+
+.exploded-control input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 16px rgba(41, 199, 216, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* Custom Range Slider — Firefox */
+
+.exploded-control input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(18, 34, 53, 0.9);
+  border: none;
+}
+
+.exploded-control input[type="range"]::-moz-range-progress {
+  height: 4px;
+  border-radius: 4px;
+  background: var(--cyan);
+}
+
+.exploded-control input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--cyan-bright), var(--cyan));
+  border: 2px solid rgba(7, 16, 27, 0.8);
+  box-shadow: 0 0 10px rgba(41, 199, 216, 0.35), 0 2px 6px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+.exploded-control input[type="range"]::-moz-range-thumb:hover {
+  box-shadow: 0 0 16px rgba(41, 199, 216, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* ===================================
+   CENTER STAGE — 3D Canvas
+   =================================== */
+
+.anatomy-stage {
+  overflow: hidden;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- Top Toolbar ---------- */
+
+.anatomy-stage-top {
+  height: 46px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.anatomy-stage-top > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stage-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.49rem;
+  color: #73dbab;
+  font-weight: 500;
+}
+
+.stage-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px rgba(62, 189, 116, 0.5);
+  animation: float-status 2.5s ease-in-out infinite;
+}
+
+.anatomy-stage-top b {
+  font-size: 0.5rem;
+  color: #657a91;
+  font-weight: 500;
+  border-left: 1px solid var(--border);
+  padding-left: 8px;
+}
+
+/* Toolbar Buttons — Segmented Control */
+
+.anatomy-stage-top button,
+.instrument-stage-toolbar button {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgba(148, 163, 184, 0.13);
+  background: rgba(7, 17, 31, 0.5);
+  color: #65798f;
+  font-size: 0.52rem;
+  font-weight: 500;
+  padding: 0 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: -1px;
+}
+
+.anatomy-stage-top button:first-child,
+.instrument-stage-toolbar button:first-child {
+  border-radius: 8px 0 0 8px;
+  margin-left: 0;
+}
+
+.anatomy-stage-top button:nth-last-child(2),
+.instrument-stage-toolbar button:nth-last-child(2) {
+  border-radius: 0 8px 8px 0;
+}
+
+/* Reset button — separate, circular */
+.anatomy-stage-top button:last-child {
+  border-radius: 50%;
+  width: 32px;
+  padding: 0;
+  justify-content: center;
+  margin-left: 6px;
+}
+
+.instrument-stage-toolbar button:last-child {
+  border-radius: 0 8px 8px 0;
+}
+
+.anatomy-stage-top button:hover,
+.instrument-stage-toolbar button:hover {
+  color: var(--text);
+  background: rgba(41, 199, 216, 0.05);
+  border-color: rgba(41, 199, 216, 0.15);
+}
+
+.anatomy-stage-top button.active,
+.instrument-stage-toolbar button.active {
+  color: var(--cyan-bright);
+  background: rgba(41, 199, 216, 0.1);
+  border-color: rgba(41, 199, 216, 0.25);
+  box-shadow: inset 0 0 12px rgba(41, 199, 216, 0.06);
+}
+
+/* ---------- 3D Canvas ---------- */
+
+.anatomy-canvas {
+  height: 555px;
+  flex: 1;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(41, 199, 216, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 30% 70%, rgba(71, 127, 196, 0.06) 0%, transparent 40%),
+    radial-gradient(ellipse at 70% 60%, rgba(62, 189, 116, 0.04) 0%, transparent 35%),
+    #08131f;
+  position: relative;
+}
+
+/* Floating 3D Labels */
+
+.anatomy-label {
+  display: block;
+  white-space: nowrap;
+  font-size: 8.5px;
+  font-weight: 500;
+  color: #d7faff;
+  background: rgba(4, 14, 24, 0.85);
+  border: 1px solid rgba(81, 216, 227, 0.3);
+  padding: 3px 7px;
+  border-radius: 5px;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Canvas Loader */
+
+.canvas-loader {
+  font-size: 0.65rem;
+  color: #6d849b;
+  animation: fadeIn 0.4s ease both;
+}
+
+/* ---------- Bottom Hint Bar ---------- */
+
+.anatomy-stage-bottom {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #5d7288;
+  font-size: 0.5rem;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+.anatomy-stage-bottom i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #3a5068;
+  opacity: 0.7;
+}
+
+/* ===================================
+   RIGHT SIDEBAR — Structure Info
+   =================================== */
+
+.structure-info {
+  padding: 20px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 14px 35px rgba(0, 0, 0, 0.22);
+  overflow-y: auto;
+  animation: fadeIn 0.5s ease both;
+}
+
+.structure-info::-webkit-scrollbar {
+  width: 4px;
+}
+
+.structure-info::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.structure-info::-webkit-scrollbar-thumb {
+  background: rgba(54, 184, 200, 0.2);
+  border-radius: 4px;
+}
+
+/* ---------- Color Swatch Header ---------- */
+
+.structure-color {
+  height: 100px;
+  border-radius: 10px;
+  position: relative;
+  margin-bottom: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.11);
+  display: grid;
+  place-items: center;
+  background-size: 200% 200%;
+  animation: color-shift 8s ease infinite;
+  overflow: hidden;
+}
+
+.structure-color > span {
+  width: 40px;
+  height: 50px;
+  border-radius: 18px 18px 12px 12px;
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+.structure-color > small {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  font-size: 0.42rem;
+  font-weight: 500;
+  color: #879aac;
+  background: rgba(7, 17, 31, 0.65);
+  padding: 4px 8px;
+  border-radius: 6px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* Structure Overview */
+
+.structure-info > .eyebrow {
+  font-size: 0.47rem;
+  margin-bottom: 4px;
+}
+
+.structure-info h2 {
+  font-size: 1.1rem;
+  margin-bottom: 10px;
+  font-weight: 650;
+}
+
+.structure-info > p:not(.eyebrow):not(.education-note) {
+  font-size: 0.59rem;
+  color: #8194a9;
+  line-height: 1.7;
+}
+
+/* ---------- Fact Cards ---------- */
+
+.structure-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin: 14px 0;
+}
+
+.structure-facts > div {
+  padding: 10px;
+  background: linear-gradient(145deg, rgba(18, 34, 53, 0.6), rgba(7, 17, 31, 0.5));
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 8px;
+  transition: border-color 0.2s ease;
+}
+
+.structure-facts > div:hover {
+  border-color: rgba(41, 199, 216, 0.15);
+}
+
+.structure-facts span,
+.structure-facts strong {
+  display: block;
+}
+
+.structure-facts span {
+  font-size: 0.41rem;
+  color: #5d7289;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.structure-facts strong {
+  font-size: 0.54rem;
+  margin-top: 4px;
+  color: var(--text);
+}
+
+/* ---------- Training Relevance ---------- */
+
+.training-relevance {
+  padding: 12px;
+  border-left: 3px solid var(--cyan);
+  background: linear-gradient(135deg, rgba(41, 199, 216, 0.06), rgba(41, 199, 216, 0.02));
+  border-radius: 0 8px 8px 0;
+  margin: 14px 0;
+  transition: background 0.3s ease;
+}
+
+.training-relevance:hover {
+  background: linear-gradient(135deg, rgba(41, 199, 216, 0.09), rgba(41, 199, 216, 0.03));
+}
+
+.training-relevance > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--cyan-bright);
+  font-size: 0.51rem;
+  font-weight: 650;
+}
+
+.training-relevance p {
+  font-size: 0.5rem !important;
+  line-height: 1.6 !important;
+  margin: 7px 0 0 !important;
+  color: #7590a6 !important;
+}
+
+/* Highlight Button */
+
+.structure-info > .button {
+  width: 100%;
+  font-size: 0.53rem;
+  margin-top: 6px;
+}
+
+/* Education Note */
+
+.education-note {
+  font-size: 0.43rem !important;
+  color: #52677e !important;
+  line-height: 1.55 !important;
+  margin: 14px 0 0 !important;
+}
+
+/* ===================================
+   SCENE FALLBACK — Error State
+   =================================== */
+
+.scene-fallback {
+  height: 100%;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--amber);
+  gap: 8px;
+  padding: 30px;
+}
+
+.scene-fallback strong {
+  font-size: 0.72rem;
+  color: #dbe6ee;
+}
+
+.scene-fallback span {
+  max-width: 280px;
+  font-size: 0.52rem;
+  line-height: 1.55;
+  color: #6d8298;
+}
+
+/* ===================================
+   APP-LEVEL STATUS BADGES
+   =================================== */
+
+.anatomy-app-status,
+.anatomy-app-mode {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  background: rgba(16, 33, 49, 0.9);
+  border-radius: 6px;
+  color: #73899b;
+  font-size: 0.42rem;
+  font-weight: 500;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.anatomy-app-status i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px rgba(66, 194, 121, 0.4);
+}
+
+/* ===================================
+   FULL-HEIGHT APP PAGE OVERRIDES
+   =================================== */
+
+.anatomy-app-page .app-page-content {
+  height: calc(100vh - 58px);
+  overflow: hidden;
+}
+
+.anatomy-app-page .anatomy-layout {
+  height: 100%;
+  min-height: 0;
+  gap: 10px;
+}
+
+.anatomy-app-page .anatomy-canvas {
+  height: calc(100vh - 149px);
+}
+
+.anatomy-app-page .panel {
+  border-radius: 8px;
+}
+
+/* ===================================
+   INSTRUMENT SECTION
+   =================================== */
+
+.instrument-section {
+  margin-top: 60px;
+  animation: fadeIn 0.5s ease both;
+}
+
+.instrument-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 18px;
+}
+
+.instrument-head h2 {
+  font-size: 1.8rem;
+  margin: 0 0 7px;
+  font-weight: 700;
+}
+
+.instrument-head > div > p:last-child {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* ---------- Instrument Layout ---------- */
+
+.instrument-layout {
+  display: grid;
+  grid-template-columns: 224px minmax(400px, 1fr) 240px;
+  gap: 14px;
+  min-height: 500px;
+}
+
+/* ---------- Instrument List (Left) ---------- */
+
+.instrument-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.instrument-list > button {
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-align: left;
+  padding: 10px;
+  border: 1px solid var(--border);
+  background: linear-gradient(145deg, rgba(19, 36, 56, 0.6), rgba(9, 22, 36, 0.9));
+  border-radius: 11px;
+  color: #889caf;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.instrument-list > button:hover {
+  border-color: rgba(41, 199, 216, 0.2);
+  background: linear-gradient(145deg, rgba(41, 199, 216, 0.04), rgba(9, 22, 36, 0.9));
+  transform: translateY(-1px);
+}
+
+.instrument-list > button.active {
+  border-color: rgba(41, 199, 216, 0.34);
+  background: linear-gradient(145deg, rgba(41, 199, 216, 0.09), rgba(9, 22, 36, 0.9));
+  box-shadow: 0 0 20px rgba(41, 199, 216, 0.08);
+}
+
+.instrument-list button > div {
+  flex: 1;
+}
+
+.instrument-list strong,
+.instrument-list small {
+  display: block;
+}
+
+.instrument-list strong {
+  font-size: 0.62rem;
+  color: #d6e2ea;
+  font-weight: 600;
+}
+
+.instrument-list small {
+  font-size: 0.46rem;
+  line-height: 1.45;
+  margin-top: 4px;
+  color: #65798f;
+}
+
+/* ---------- Instrument Thumbnail ---------- */
+
+.instrument-thumb {
+  width: 50px;
+  height: 56px;
+  flex: 0 0 auto;
+  position: relative;
+  background: radial-gradient(circle, rgba(41, 199, 216, 0.12), transparent 70%);
+  border-radius: 8px;
+}
+
+.instrument-thumb i,
+.instrument-thumb b {
+  position: absolute;
+  background: #a9b8bf;
+}
+
+.instrument-thumb i {
+  width: 4px;
+  height: 45px;
+  left: 20px;
+  top: 5px;
+  transform: rotate(-22deg);
+}
+
+.instrument-thumb b {
+  width: 4px;
+  height: 45px;
+  right: 18px;
+  top: 5px;
+  transform: rotate(22deg);
+}
+
+/* Needle variant */
+
+.instrument-thumb.needle i {
+  width: 34px;
+  height: 34px;
+  border: 4px solid #a9b8bf;
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  border-radius: 50%;
+  background: none;
+  left: 8px;
+  top: 11px;
+}
+
+.instrument-thumb.needle b {
+  display: none;
+}
+
+/* Forceps variant */
+
+.instrument-thumb.forceps i,
+.instrument-thumb.forceps b {
+  transform: rotate(-5deg);
+}
+
+.instrument-thumb.forceps b {
+  transform: rotate(5deg);
+}
+
+/* ---------- Instrument Stage (Center) ---------- */
+
+.instrument-stage {
+  overflow: hidden;
+  position: relative;
+  height: 500px;
+}
+
+.instrument-stage canvas {
+  height: 100% !important;
+}
+
+.instrument-stage-toolbar {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(8, 21, 34, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.instrument-stage-toolbar > span {
+  font-size: 0.52rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* ---------- Instrument Part Tabs ---------- */
+
+.instrument-part-tabs {
+  position: absolute;
+  z-index: 4;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(7, 17, 31, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.instrument-part-tabs button {
+  border: 0;
+  background: none;
+  color: #61768c;
+  padding: 7px 10px;
+  font-size: 0.48rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 5px;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.instrument-part-tabs button:hover {
+  color: var(--text);
+  background: rgba(41, 199, 216, 0.04);
+}
+
+.instrument-part-tabs button.active {
+  color: var(--cyan-bright);
+  background: rgba(41, 199, 216, 0.12);
+  box-shadow: 0 0 8px rgba(41, 199, 216, 0.08);
+}
+
+/* ---------- Instrument Info (Right) ---------- */
+
+.instrument-info {
+  padding: 18px;
+}
+
+.instrument-info > .eyebrow {
+  font-size: 0.46rem;
+  margin-bottom: 4px;
+}
+
+.instrument-info h3 {
+  font-size: 1.05rem;
+  margin-bottom: 18px;
+  font-weight: 650;
+}
+
+.instrument-info dl {
+  margin: 0;
+}
+
+.instrument-info dl > div {
+  padding: 11px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  transition: background 0.2s ease;
+}
+
+.instrument-info dl > div:hover {
+  background: rgba(41, 199, 216, 0.02);
+}
+
+.instrument-info dt {
+  font-size: 0.43rem;
+  color: #60758b;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 500;
+}
+
+.instrument-info dd {
+  margin: 5px 0 0;
+  font-size: 0.55rem;
+  line-height: 1.5;
+  color: #c1ced9;
+}
+
+/* ---------- Selected Part Highlight ---------- */
+
+.selected-part {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 9px;
+  background: rgba(41, 199, 216, 0.05);
+  border: 1px solid rgba(41, 199, 216, 0.14);
+  transition: all 0.25s ease;
+}
+
+.selected-part:hover {
+  border-color: rgba(41, 199, 216, 0.22);
+  background: rgba(41, 199, 216, 0.07);
+}
+
+.selected-part span,
+.selected-part strong {
+  display: block;
+}
+
+.selected-part span {
+  font-size: 0.43rem;
+  color: #5e748a;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.selected-part strong {
+  font-size: 0.62rem;
+  color: var(--cyan-bright);
+  margin: 4px 0;
+  font-weight: 600;
+}
+
+.selected-part p {
+  font-size: 0.48rem;
+  line-height: 1.55;
+  color: #70859b;
+  margin: 0;
+}
+
+/* ===================================
+   RESPONSIVE BREAKPOINTS
+   =================================== */
+
+@media (max-width: 1250px) {
+  .anatomy-layout {
+    grid-template-columns: 210px 1fr;
+  }
+
+  .structure-info {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 160px 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+
+  .structure-color {
+    grid-row: 1 / 4;
+  }
+
+  .structure-info > .eyebrow,
+  .structure-info > h2 {
+    grid-column: 2;
+  }
+
+  .structure-info > p {
+    grid-column: 2;
+  }
+
+  .structure-facts,
+  .training-relevance {
+    grid-column: 3;
+  }
+
+  .structure-info > .button {
+    grid-column: 3;
+  }
+
+  .education-note {
+    grid-column: 2 / 4 !important;
+  }
+
+  .instrument-layout {
+    grid-template-columns: 190px 1fr;
+  }
+
+  .instrument-info {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 850px) {
+  .anatomy-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .anatomy-controls {
+    order: 2;
+  }
+
+  .anatomy-stage {
+    order: 1;
+  }
+
+  .structure-info {
+    order: 3;
+    grid-template-columns: 1fr;
+  }
+
+  .structure-color {
+    grid-row: auto;
+  }
+
+  .structure-info > .eyebrow,
+  .structure-info > h2,
+  .structure-info > p,
+  .structure-facts,
+  .training-relevance,
+  .structure-info > .button,
+  .education-note {
+    grid-column: auto !important;
+  }
+
+  .layer-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .instrument-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .instrument-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .instrument-stage {
+    height: 430px;
+  }
+
+  .instrument-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 600px) {
+  .anatomy-canvas {
+    height: 470px;
+  }
+
+  .anatomy-stage-top > div:last-child button {
+    font-size: 0;
+    padding: 0 8px;
+  }
+
+  .anatomy-stage-bottom {
+    gap: 6px;
+  }
+
+  .layer-list,
+  .instrument-list {
+    grid-template-columns: 1fr;
+  }
+
+  .instrument-head h2 {
+    font-size: 1.45rem;
+  }
+}
