@@ -80,7 +80,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     setState((current): SimulationState => ({
       ...current,
       selectedTool: null,
-      feedback: [{ id: `${Date.now()}-release`, tone: "info", title: "Tool released", message: "Open palm detected. The active instrument was returned to the tray.", timestamp: current.elapsedTime }, ...current.feedback].slice(0, 8),
+      feedback: [{ id: `${Date.now()}-release`, tone: "info" as const, title: "Tool released", message: "Open palm detected. The active instrument was returned to the tray.", timestamp: current.elapsedTime }, ...current.feedback].slice(0, 8),
     }));
   }, []);
 
