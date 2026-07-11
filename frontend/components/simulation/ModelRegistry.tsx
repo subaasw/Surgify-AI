@@ -13,10 +13,12 @@ type MedicalGLBProps = Omit<ThreeElements["group"], "children"> & {
   metalness?: number;
   roughness?: number;
   preserveTextures?: boolean;
+  preserveMaterials?: boolean;
   emissive?: string;
   emissiveIntensity?: number;
   opacity?: number;
   wireframe?: boolean;
+  castShadows?: boolean;
 };
 
 /**
@@ -30,10 +32,12 @@ export function MedicalGLB({
   metalness = .12,
   roughness = .58,
   preserveTextures = true,
+  preserveMaterials = false,
   emissive = "#000000",
   emissiveIntensity = 0,
   opacity = 1,
   wireframe = false,
+  castShadows = true,
   ...props
 }: MedicalGLBProps) {
   const { scene } = useGLTF(path);
@@ -41,12 +45,12 @@ export function MedicalGLB({
     const clone = scene.clone(true);
     clone.traverse(object => {
       if (!(object instanceof THREE.Mesh)) return;
-      object.castShadow = true;
+      object.castShadow = castShadows;
       object.receiveShadow = true;
       const authoredMaterials = Array.isArray(object.material) ? object.material : [object.material];
       const materials = authoredMaterials.map(authored => {
         const hasTexture = authored && "map" in authored && Boolean(authored.map);
-        if (preserveTextures && hasTexture) {
+        if (preserveMaterials || (preserveTextures && hasTexture)) {
           const material = authored.clone();
           if ("roughness" in material && typeof material.roughness === "number") material.roughness = Math.max(material.roughness, roughness);
           material.transparent = opacity < 1;
@@ -68,23 +72,23 @@ export function MedicalGLB({
     clone.scale.multiplyScalar(scale);
     clone.position.copy(center).multiplyScalar(-scale);
     return clone;
-  }, [scene, targetSize, color, metalness, roughness, preserveTextures, emissive, emissiveIntensity, opacity, wireframe]);
+  }, [scene, targetSize, color, metalness, roughness, preserveTextures, preserveMaterials, emissive, emissiveIntensity, opacity, wireframe, castShadows]);
   return <group {...props}><primitive object={normalized} /></group>;
 }
 
 /** Loads the user-supplied alternate patient FBX when the primary GLB fails. */
-export function MedicalFBX({ path, targetSize = 3, color = "#c9937d", metalness = 0, roughness = .7, preserveTextures = true, opacity = 1, wireframe = false, ...props }: MedicalGLBProps) {
+export function MedicalFBX({ path, targetSize = 3, color = "#c9937d", metalness = 0, roughness = .7, preserveTextures = true, preserveMaterials = false, opacity = 1, wireframe = false, castShadows = true, ...props }: MedicalGLBProps) {
   const source = useLoader(FBXLoader, path);
   const normalized = useMemo(() => {
     const clone = source.clone(true);
     clone.traverse(object => {
       if (!(object instanceof THREE.Mesh)) return;
-      object.castShadow = true;
+      object.castShadow = castShadows;
       object.receiveShadow = true;
       const authoredMaterials = Array.isArray(object.material) ? object.material : [object.material];
       const materials = authoredMaterials.map(authored => {
         const hasTexture = authored && "map" in authored && Boolean(authored.map);
-        if (preserveTextures && hasTexture) {
+        if (preserveMaterials || (preserveTextures && hasTexture)) {
           const material = authored.clone();
           material.transparent = opacity < 1;
           material.opacity = opacity;
@@ -104,7 +108,7 @@ export function MedicalFBX({ path, targetSize = 3, color = "#c9937d", metalness 
     clone.scale.multiplyScalar(scale);
     clone.position.copy(center).multiplyScalar(-scale);
     return clone;
-  }, [source, targetSize, color, metalness, roughness, preserveTextures, opacity, wireframe]);
+  }, [source, targetSize, color, metalness, roughness, preserveTextures, preserveMaterials, opacity, wireframe, castShadows]);
   return <group {...props}><primitive object={normalized} /></group>;
 }
 

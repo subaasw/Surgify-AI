@@ -8,26 +8,27 @@ import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { SceneErrorBoundary } from "@/components/anatomy/SceneErrorBoundary";
 import { useSimulation } from "./SimulationProvider";
 import type { CameraMode } from "@/types/simulation";
-import { MedicalFBX, MedicalGLB, ModelErrorBoundary, SafeMedicalGLB } from "./ModelRegistry";
+import { MedicalGLB, ModelErrorBoundary, SafeMedicalGLB } from "./ModelRegistry";
 import { GestureHand, HandTrackingDriver } from "./GestureHandControl";
 import { MODEL_PATHS } from "@/data/modelConfig";
 
 const presets: Record<Exclude<CameraMode, "webcam"> | "pov", { position: [number, number, number]; target: [number, number, number] }> = {
   // first-person surgeon view: hands enter from the bottom edge like VR
   pov: { position: [0, 3.5, 4.3], target: [0, 1.35, -1] },
-  room: { position: [6.7, 4.8, 7.3], target: [0, 1.15, 0] },
-  patient: { position: [4.2, 3.4, 5.2], target: [0, 1.45, 0] },
+  room: { position: [3.45, 4.7, 5.9], target: [0, 1.15, 0] },
+  patient: { position: [3.35, 3.4, 4.7], target: [0, 1.45, 0] },
   closeup: { position: [-3.2, 2.6, 2.7], target: [-1.05, 1.48, .28] },
-  anatomy: { position: [3.6, 2.8, 4.2], target: [-.4, 1.5, .1] },
-  tray: { position: [4.6, 3.3, -.2], target: [2.7, 1.15, -.7] },
+  anatomy: { position: [3.35, 2.8, 4.2], target: [-.4, 1.5, .1] },
+  tray: { position: [3.35, 3.3, -.2], target: [2.7, 1.15, -.7] },
 };
+const cameraBounds = { min: new THREE.Vector3(-3.55, .45, -5.95), max: new THREE.Vector3(3.55, 5.1, 6.35) };
 
 export function HospitalScene() {
   const { state, selectRegion } = useSimulation();
   const patientProps = { selected: state.selectedRegion, anatomy: state.anatomyOverlay, stitchPhase: state.stitchPhase, selectedTool: state.selectedTool, onSelect: selectRegion };
   const proceduralPatient = <FallbackPatient {...patientProps} />;
-  const alternatePatient = <ModelErrorBoundary fallback={proceduralPatient}><Suspense fallback={proceduralPatient}><LoadedAlternatePatient {...patientProps} /></Suspense></ModelErrorBoundary>;
-  return <SceneErrorBoundary>{state.trackingOverlay && <HandTrackingDriver />}<Canvas shadows dpr={[1, 1.5]} camera={{ position: presets.room.position, fov: 44, near: .1, far: 40 }} gl={{ antialias: true }}><color attach="background" args={["#d7dde0"]} /><fog attach="fog" args={["#cdd4d7", 11, 23]} /><ambientLight intensity={.72} /><hemisphereLight args={["#eaf5f7", "#7b8588", 1.25]} /><directionalLight castShadow position={[4, 8, 5]} intensity={2.2} color="#f7fbfa" shadow-mapSize={[1024, 1024]} /><pointLight position={[-4, 3.5, 1]} intensity={1.2} color="#b8dcf2" /><Environment resolution={32}><Lightformer form="rect" intensity={1.2} color="#e9fbff" scale={[8, 3, 1]} position={[0, 6, -1]} rotation={[Math.PI / 2, 0, 0]} /></Environment><CameraRig mode={state.trackingOverlay ? "pov" : state.cameraMode === "webcam" ? "room" : state.cameraMode} /><HospitalRoom /><FallbackHospitalBed /><ModelErrorBoundary fallback={alternatePatient}><Suspense fallback={proceduralPatient}><LoadedPatient {...patientProps} /></Suspense></ModelErrorBoundary><FallbackMonitor /><IVStand /><BedsideCabinet /><ExamLight /><InstrumentTray selectedTool={state.selectedTool} /><Stool />{state.trackingOverlay && <GestureHand />}<ContactShadows position={[0, .02, 0]} opacity={.32} scale={15} blur={2.6} far={5} /></Canvas></SceneErrorBoundary>;
+  const legacyPatient = <ModelErrorBoundary fallback={proceduralPatient}><Suspense fallback={proceduralPatient}><LoadedLegacyPatient {...patientProps} /></Suspense></ModelErrorBoundary>;
+  return <SceneErrorBoundary>{state.trackingOverlay && <HandTrackingDriver />}<Canvas shadows dpr={1} camera={{ position: presets.room.position, fov: 44, near: .1, far: 40 }} gl={{ antialias: true }}><color attach="background" args={["#02070b"]} /><fog attach="fog" args={["#091119", 12, 23]} /><ambientLight intensity={.72} /><hemisphereLight args={["#eaf5f7", "#26333a", 1.25]} /><directionalLight castShadow position={[4, 8, 5]} intensity={2.2} color="#f7fbfa" shadow-mapSize={[512, 512]} /><pointLight position={[-4, 3.5, 1]} intensity={1.2} color="#b8dcf2" /><Environment resolution={32}><Lightformer form="rect" intensity={1.2} color="#e9fbff" scale={[8, 3, 1]} position={[0, 6, -1]} rotation={[Math.PI / 2, 0, 0]} /></Environment><CameraRig mode={state.trackingOverlay ? "pov" : state.cameraMode === "webcam" ? "room" : state.cameraMode} /><SafeMedicalGLB path={MODEL_PATHS.operationTheatre} targetSize={14} preserveMaterials castShadows={false} position={[0,1.66,0]} rotation={[0,Math.PI/2,0]} fallback={<HospitalRoom />} /><SafeMedicalGLB path={MODEL_PATHS.hospitalBed} targetSize={5.35} preserveMaterials position={[0,1.12,0]} fallback={<FallbackHospitalBed />} /><ModelErrorBoundary fallback={legacyPatient}><Suspense fallback={proceduralPatient}><LoadedPatient {...patientProps} /></Suspense></ModelErrorBoundary><FallbackMonitor /><IVStand /><InstrumentTray selectedTool={state.selectedTool} />{state.trackingOverlay && <GestureHand />}<ContactShadows frames={1} resolution={192} position={[0, .02, 0]} opacity={.32} scale={15} blur={2.6} far={5} /></Canvas></SceneErrorBoundary>;
 }
 
 function CameraRig({ mode }: { mode: Exclude<CameraMode, "webcam"> | "pov" }) {
@@ -51,8 +52,9 @@ function CameraRig({ mode }: { mode: Exclude<CameraMode, "webcam"> | "pov" }) {
     control.target.y = THREE.MathUtils.clamp(control.target.y, .55, 3.1);
     control.target.z = THREE.MathUtils.clamp(control.target.z, -3.4, 3.4);
     control.update();
+    camera.position.clamp(cameraBounds.min, cameraBounds.max);
   });
-  return <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={.08} enablePan minDistance={2.15} maxDistance={10.5} minPolarAngle={.28} maxPolarAngle={1.47} minAzimuthAngle={-1.8} maxAzimuthAngle={1.8} target={presets.room.target} />;
+  return <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={.08} enablePan minDistance={2.15} maxDistance={7.8} minPolarAngle={.28} maxPolarAngle={1.47} minAzimuthAngle={-1.8} maxAzimuthAngle={1.8} target={presets.room.target} />;
 }
 
 function HospitalRoom() {
@@ -88,25 +90,25 @@ type PatientProps = { selected: string | null; anatomy: boolean; stitchPhase: nu
 function LoadedPatient({ selected, anatomy, stitchPhase, selectedTool, onSelect }: PatientProps) {
   const breathing = useRef<THREE.Group>(null);
   useFrame(({ clock }) => {
-    if (breathing.current) breathing.current.position.y = 1.46 + Math.sin(clock.elapsedTime * 1.35) * .008;
+    if (breathing.current) breathing.current.position.y = 1.74 + Math.sin(clock.elapsedTime * 1.35) * .008;
   });
   return <group>
-    <group ref={breathing} position={[0, 1.46, -.05]}>
-      <MedicalGLB path={MODEL_PATHS.patient} targetSize={4.35} preserveTextures opacity={anatomy ? .38 : 1} />
+    <group ref={breathing} position={[0, 1.74, -.05]}>
+      <MedicalGLB path={MODEL_PATHS.patient} targetSize={3.85} preserveTextures castShadows={false} opacity={anatomy ? .38 : 1} />
     </group>
     <PatientInteractionZones selected={selected} anatomy={anatomy} stitchPhase={stitchPhase} selectedTool={selectedTool} onSelect={onSelect} />
   </group>;
 }
 
-function LoadedAlternatePatient({ selected, anatomy, stitchPhase, selectedTool, onSelect }: PatientProps) {
+function LoadedLegacyPatient({ selected, anatomy, stitchPhase, selectedTool, onSelect }: PatientProps) {
   return <group>
-    <group position={[0,1.46,-.05]} rotation={[-Math.PI/2,0,0]}><MedicalFBX path={MODEL_PATHS.alternatePatient} targetSize={4.35} preserveTextures opacity={anatomy ? .38 : 1} /></group>
+    <group position={[0,1.46,-.05]}><MedicalGLB path={MODEL_PATHS.legacyPatient} targetSize={4.35} preserveTextures opacity={anatomy ? .38 : 1} /></group>
     <PatientInteractionZones selected={selected} anatomy={anatomy} stitchPhase={stitchPhase} selectedTool={selectedTool} onSelect={onSelect} />
   </group>;
 }
 
 function PatientInteractionZones({ selected, anatomy, stitchPhase, selectedTool, onSelect }: PatientProps) {
-  return <group position={[0, 1.38, -.08]}>
+  return <group position={[0, 1.55, -.08]}>
     <group position={[0,.18,-1.65]}><Region region="Head" selected={selected} onSelect={onSelect}><mesh scale={[.48,.4,.55]}><sphereGeometry args={[1,16,12]} /><HitMaterial /></mesh></Region></group>
     <group position={[0,.1,-.62]}><Region region="Chest" selected={selected} onSelect={onSelect}><mesh rotation={[Math.PI/2,0,0]} scale={[.9,.56,1]}><capsuleGeometry args={[.48,1.05,8,14]} /><HitMaterial /></mesh></Region>{anatomy&&<TorsoAnatomy />}</group>
     <group position={[0,.08,.08]}><Region region="Abdomen" selected={selected} onSelect={onSelect}><mesh rotation={[Math.PI/2,0,0]} scale={[.8,.5,.82]}><capsuleGeometry args={[.45,.72,8,14]} /><HitMaterial /></mesh></Region></group>
@@ -177,8 +179,6 @@ export function FallbackMonitor(){return <group position={[2.95,2.35,-1.85]}><me
 
 function IVStand(){return <group position={[-2.6,0,-1.65]}><mesh position={[0,1.55,0]}><cylinderGeometry args={[.025,.035,3.1,10]}/><meshStandardMaterial color="#8f9a9e" metalness={.7}/></mesh><mesh position={[0,3.02,0]}><boxGeometry args={[.65,.035,.035]}/><meshStandardMaterial color="#8f9a9e" metalness={.7}/></mesh><mesh position={[-.24,2.65,0]}><boxGeometry args={[.28,.52,.08]}/><meshPhysicalMaterial color="#d6eef0" transparent opacity={.55}/></mesh><Line points={[[ -.24,2.38,0],[-.24,1.65,0],[-1.05,1.45,.15]]} color="#98bdc2" lineWidth={.6}/><mesh rotation={[-Math.PI/2,0,0]} position={[0,.04,0]}><torusGeometry args={[.42,.025,8,24]}/><meshStandardMaterial color="#6f7b80" metalness={.6}/></mesh></group>}
 
-function BedsideCabinet(){return <group position={[-3.2,.55,-.2]}><RoundedBox args={[1.05,1.1,.78]} radius={.06}><meshStandardMaterial color="#b7c0c1" roughness={.7}/></RoundedBox>{[.27,0,-.27].map(y=><mesh key={y} position={[0,y,.4]}><boxGeometry args={[.8,.02,.02]}/><meshStandardMaterial color="#7e8a8e"/></mesh>)}</group>}
-function ExamLight(){return <group position={[2.9,3.4,-3.75]} rotation={[0,0,-.3]}><mesh><cylinderGeometry args={[.06,.06,2.2,12]}/><meshStandardMaterial color="#778489" metalness={.45}/></mesh><mesh position={[0,-1.25,.3]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[.52,.38,.22,24]}/><meshStandardMaterial color="#e5e8e5" roughness={.5}/></mesh><pointLight position={[0,-1.4,.4]} color="#fff5dd" intensity={.8}/></group>}
 function InstrumentTray({selectedTool}:{selectedTool:string|null}){
   const assets: Record<string, {path:string; rotation:[number,number,number]}> = {
     "Needle holder": { path: MODEL_PATHS.needleHolder, rotation: [Math.PI/2,0,0] },
@@ -189,4 +189,3 @@ function InstrumentTray({selectedTool}:{selectedTool:string|null}){
   const asset = selectedTool ? assets[selectedTool] : undefined;
   return <group position={[2.8,1.05,-.62]}><mesh><boxGeometry args={[1.35,.06,.76]}/><meshStandardMaterial color="#aab6b9" metalness={.75} roughness={.25}/></mesh>{[-.48,.48].map(x=><mesh key={x} position={[x,-.58,0]}><cylinderGeometry args={[.03,.04,1.15,10]}/><meshStandardMaterial color="#717e83" metalness={.5}/></mesh>)}{asset ? <SafeMedicalGLB path={asset.path} targetSize={.75} color="#bdc8cc" metalness={.84} roughness={.2} preserveTextures={false} position={[0,.13,0]} rotation={asset.rotation} fallback={<group />} /> : <><mesh position={[-.28,.07,0]} rotation={[0,.15,0]}><boxGeometry args={[.07,.04,.65]}/><meshStandardMaterial color="#c8d0d2" metalness={.8}/></mesh><mesh position={[.18,.07,.05]} rotation={[0,-.3,0]}><boxGeometry args={[.06,.04,.58]}/><meshStandardMaterial color="#c8d0d2" metalness={.8}/></mesh></>}{selectedTool&&<Html position={[0,.35,0]} center><span className="active-tray-label">{selectedTool} selected</span></Html>}</group>
 }
-function Stool(){return <group position={[3.75,.6,1.65]}><mesh><cylinderGeometry args={[.48,.48,.18,28]}/><meshStandardMaterial color="#63747b" roughness={.65}/></mesh><mesh position={[0,-.5,0]}><cylinderGeometry args={[.05,.07,.9,12]}/><meshStandardMaterial color="#778388" metalness={.55}/></mesh><mesh rotation={[-Math.PI/2,0,0]} position={[0,-.95,0]}><torusGeometry args={[.55,.035,8,24]}/><meshStandardMaterial color="#68757a" metalness={.55}/></mesh></group>}

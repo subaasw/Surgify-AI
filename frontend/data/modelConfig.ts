@@ -3,8 +3,9 @@
  * offline. Add freely licensed GLB paths here when production assets arrive.
  */
 export const modelConfig = {
-  patient: { source: "/3d/patient.glb", alternateSource: "/3d/patient2.fbx", fallback: "FallbackPatient" },
-  hospitalBed: { source: "/models/hospital-bed.glb", fallback: "FallbackHospitalBed" },
+  patient: { source: "/3d/mainPatient.glb", alternateSource: "/3d/patient.glb", fallback: "FallbackPatient" },
+  operationTheatre: { source: "/3d/OT.glb", fallback: "HospitalRoom" },
+  hospitalBed: { source: "/3d/strecher.glb", fallback: "FallbackHospitalBed" },
   monitor: { source: "/models/monitor.glb", fallback: "FallbackMonitor" },
   anatomy: { source: null, fallback: "procedural-torso" },
   instruments: {
@@ -26,10 +27,12 @@ export const modelConfig = {
 } as const;
 
 export const MODEL_PATHS = {
-  patient: "/3d/patient.glb",
+  patient: "/3d/mainPatient.glb",
+  legacyPatient: "/3d/patient.glb",
   alternatePatient: "/3d/patient2.fbx",
   hand: "/3d/hand.glb",
-  hospitalBed: "/models/hospital-bed.glb",
+  operationTheatre: "/3d/OT.glb",
+  hospitalBed: "/3d/strecher.glb",
   monitor: "/models/monitor.glb",
   needleHolder: "/3d/Instruments/NeedleHolder.glb",
   forceps: "/3d/Instruments/Forceps.glb",
