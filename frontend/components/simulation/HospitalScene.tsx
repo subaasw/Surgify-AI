@@ -12,7 +12,9 @@ import { MedicalFBX, MedicalGLB, ModelErrorBoundary, SafeMedicalGLB } from "./Mo
 import { GestureHand, HandTrackingDriver } from "./GestureHandControl";
 import { MODEL_PATHS } from "@/data/modelConfig";
 
-const presets: Record<Exclude<CameraMode, "webcam">, { position: [number, number, number]; target: [number, number, number] }> = {
+const presets: Record<Exclude<CameraMode, "webcam"> | "pov", { position: [number, number, number]; target: [number, number, number] }> = {
+  // first-person surgeon view: hands enter from the bottom edge like VR
+  pov: { position: [0, 3.5, 4.3], target: [0, 1.35, -1] },
   room: { position: [6.7, 4.8, 7.3], target: [0, 1.15, 0] },
   patient: { position: [4.2, 3.4, 5.2], target: [0, 1.45, 0] },
   closeup: { position: [-3.2, 2.6, 2.7], target: [-1.05, 1.48, .28] },
@@ -25,10 +27,10 @@ export function HospitalScene() {
   const patientProps = { selected: state.selectedRegion, anatomy: state.anatomyOverlay, stitchPhase: state.stitchPhase, selectedTool: state.selectedTool, onSelect: selectRegion };
   const proceduralPatient = <FallbackPatient {...patientProps} />;
   const alternatePatient = <ModelErrorBoundary fallback={proceduralPatient}><Suspense fallback={proceduralPatient}><LoadedAlternatePatient {...patientProps} /></Suspense></ModelErrorBoundary>;
-  return <SceneErrorBoundary>{state.trackingOverlay && <HandTrackingDriver />}<Canvas shadows dpr={[1, 1.5]} camera={{ position: presets.room.position, fov: 44, near: .1, far: 40 }} gl={{ antialias: true }}><color attach="background" args={["#d7dde0"]} /><fog attach="fog" args={["#cdd4d7", 11, 23]} /><ambientLight intensity={.72} /><hemisphereLight args={["#eaf5f7", "#7b8588", 1.25]} /><directionalLight castShadow position={[4, 8, 5]} intensity={2.2} color="#f7fbfa" shadow-mapSize={[1024, 1024]} /><pointLight position={[-4, 3.5, 1]} intensity={1.2} color="#b8dcf2" /><Environment resolution={32}><Lightformer form="rect" intensity={1.2} color="#e9fbff" scale={[8, 3, 1]} position={[0, 6, -1]} rotation={[Math.PI / 2, 0, 0]} /></Environment><CameraRig mode={state.cameraMode === "webcam" ? "room" : state.cameraMode} /><HospitalRoom /><FallbackHospitalBed /><ModelErrorBoundary fallback={alternatePatient}><Suspense fallback={proceduralPatient}><LoadedPatient {...patientProps} /></Suspense></ModelErrorBoundary><FallbackMonitor /><IVStand /><BedsideCabinet /><ExamLight /><InstrumentTray selectedTool={state.selectedTool} /><Stool />{state.trackingOverlay && <GestureHand />}<ContactShadows position={[0, .02, 0]} opacity={.32} scale={15} blur={2.6} far={5} /></Canvas></SceneErrorBoundary>;
+  return <SceneErrorBoundary>{state.trackingOverlay && <HandTrackingDriver />}<Canvas shadows dpr={[1, 1.5]} camera={{ position: presets.room.position, fov: 44, near: .1, far: 40 }} gl={{ antialias: true }}><color attach="background" args={["#d7dde0"]} /><fog attach="fog" args={["#cdd4d7", 11, 23]} /><ambientLight intensity={.72} /><hemisphereLight args={["#eaf5f7", "#7b8588", 1.25]} /><directionalLight castShadow position={[4, 8, 5]} intensity={2.2} color="#f7fbfa" shadow-mapSize={[1024, 1024]} /><pointLight position={[-4, 3.5, 1]} intensity={1.2} color="#b8dcf2" /><Environment resolution={32}><Lightformer form="rect" intensity={1.2} color="#e9fbff" scale={[8, 3, 1]} position={[0, 6, -1]} rotation={[Math.PI / 2, 0, 0]} /></Environment><CameraRig mode={state.trackingOverlay ? "pov" : state.cameraMode === "webcam" ? "room" : state.cameraMode} /><HospitalRoom /><FallbackHospitalBed /><ModelErrorBoundary fallback={alternatePatient}><Suspense fallback={proceduralPatient}><LoadedPatient {...patientProps} /></Suspense></ModelErrorBoundary><FallbackMonitor /><IVStand /><BedsideCabinet /><ExamLight /><InstrumentTray selectedTool={state.selectedTool} /><Stool />{state.trackingOverlay && <GestureHand />}<ContactShadows position={[0, .02, 0]} opacity={.32} scale={15} blur={2.6} far={5} /></Canvas></SceneErrorBoundary>;
 }
 
-function CameraRig({ mode }: { mode: Exclude<CameraMode, "webcam"> }) {
+function CameraRig({ mode }: { mode: Exclude<CameraMode, "webcam"> | "pov" }) {
   const controls = useRef<OrbitControlsImpl>(null);
   const transitioning = useRef(true);
   const { camera } = useThree();

@@ -6,10 +6,9 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { FilesetResolver, GestureRecognizer } from "@mediapipe/tasks-vision";
-import { useSimulation } from "./SimulationProvider";
-import { ModelErrorBoundary, SafeMedicalGLB } from "./ModelRegistry";
+import { ModelErrorBoundary } from "./ModelRegistry";
 import { MODEL_PATHS } from "@/data/modelConfig";
-import { WORKSPACE, damp, palmPose, springStep } from "@/lib/handPhysics.mjs";
+import { LandmarkFilter, WORKSPACE, classifyPose, damp, fingerDirs, palmPose, springStep } from "@/lib/handPhysics.mjs";
 
 type Landmark = { x: number; y: number; z: number };
 export type TrackedHand = {
@@ -18,27 +17,32 @@ export type TrackedHand = {
   pinch: boolean;
   pointer: { x: number; y: number };
   landmarks: Landmark[];
+  world: Landmark[]; // metric 3D (meters) — drives orientation and finger joints
   side: Side;
 };
 
 type Side = "Left" | "Right";
+type Workspace = typeof WORKSPACE;
 
 /** Latest detections, written by the driver and read at render rate by useFrame. */
-export const handStore: { hands: TrackedHand[]; at: number; gripSide: Side | null } = { hands: [], at: 0, gripSide: null };
+export const handStore: {
+  hands: TrackedHand[];
+  at: number;
+  /** Depth mapping personalized during calibration; null until an open palm has been shown. */
+  workspace: Workspace | null;
+} = { hands: [], at: 0, workspace: null };
 
 const WASM_PATH = "/mediapipe/wasm";
 const MODEL_PATH = "/mediapipe/gesture_recognizer.task";
-const RELEASE_MS = 600; // sustained open palms before the tool returns to the tray
-const STALE_MS = 400; // no detection for this long → hand parks by the tray
+const STALE_MS = 400; // no detection for this long → hand fades out
 const PINCH_RATIO = .35; // thumb→index tip distance relative to hand size
-
-// Calibration knob for the tracked GLB proxy.
-const HAND_LENGTH = .62;
-const FLIP_HANDEDNESS = false; // flip if the on-screen hands mirror your real ones
-const PARK: Record<Side, { x: number; y: number; z: number }> = {
-  Right: { x: 2.3, y: 2.35, z: 1.5 },
-  Left: { x: -2.3, y: 2.35, z: 1.5 },
-};
+const HAND_LENGTH = .62; // wrist → middle fingertip, world units
+const CALIBRATION_FRAMES = 40; // ~1.3s of open palm before the hands go live
+// one-euro tuning: image coords are 0..1, world coords are meters — the same
+// knobs behave well for both since both spans are ~unit scale. Raise beta for
+// less motion lag, raise cutoff for less rest smoothing.
+const FILTER_CUTOFF = 1.2;
+const FILTER_BETA = 5;
 
 /**
  * Which surgeon hand a detection drives. Screen position is the ground truth:
@@ -47,7 +51,7 @@ const PARK: Record<Side, { x: number; y: number; z: number }> = {
  * MediaPipe's (noisy, mirror-convention) handedness labels; with one hand we
  * fall back to the label, inverted because we feed raw un-mirrored frames.
  */
-function assignSides(hands: Omit<TrackedHand, "side">[]): TrackedHand[] {
+function assignSides<T extends { handedness: string; landmarks: Landmark[] }>(hands: T[]): (T & { side: Side })[] {
   if (hands.length === 2) {
     const sorted = [...hands].sort((a, b) => a.landmarks[0].x - b.landmarks[0].x);
     return [{ ...sorted[0], side: "Right" as const }, { ...sorted[1], side: "Left" as const }];
@@ -58,23 +62,21 @@ function assignSides(hands: Omit<TrackedHand, "side">[]): TrackedHand[] {
 const HAND_CONNECTIONS = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12], [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [17, 18], [18, 19], [19, 20], [0, 17]] as const;
 const SIDE_COLORS: Record<Side, string> = { Right: "#5fd4de", Left: "#f0c25e" };
 
-type TrackingPhase = "starting" | "denied" | "offline" | "active";
+type TrackingPhase = "starting" | "denied" | "offline" | "calibrating" | "active";
 
 /**
  * DOM side of gesture control: runs MediaPipe gesture recognition directly in
  * the browser (GPU-accelerated, per video frame — no backend round trip),
- * publishes every detected hand into `handStore`, and shows a
- * picture-in-picture camera panel with the detected skeletons and gestures
- * drawn live over the video. Render it outside the r3f Canvas.
+ * one-euro-smooths every landmark, and publishes each detected hand into
+ * `handStore`. Starts with a short open-palm calibration that measures the
+ * hand at rest distance so depth (reach) maps to the user's own range.
+ * Renders the picture-in-picture camera panel; keep it outside the r3f Canvas.
  */
 export function HandTrackingDriver() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const [phase, setPhase] = useState<TrackingPhase>("starting");
   const [gesture, setGesture] = useState("No hands");
-  const { state, releaseTool } = useSimulation();
-  const simRef = useRef({ selectedTool: state.selectedTool, releaseTool });
-  useEffect(() => { simRef.current = { selectedTool: state.selectedTool, releaseTool }; }, [state.selectedTool, releaseTool]);
 
   useEffect(() => {
     let stopped = false;
@@ -82,7 +84,12 @@ export function HandTrackingDriver() {
     let recognizer: GestureRecognizer | null = null;
     let rafId = 0;
     let lastVideoTime = -1;
-    let openSince = 0;
+    let lastNow = 0;
+    const calSizes: number[] = [];
+    const filters: Record<Side, { image: LandmarkFilter; world: LandmarkFilter }> = {
+      Right: { image: new LandmarkFilter(FILTER_CUTOFF, FILTER_BETA), world: new LandmarkFilter(FILTER_CUTOFF, FILTER_BETA) },
+      Left: { image: new LandmarkFilter(FILTER_CUTOFF, FILTER_BETA), world: new LandmarkFilter(FILTER_CUTOFF, FILTER_BETA) },
+    };
 
     const drawOverlay = (hands: TrackedHand[]) => {
       const overlay = overlayRef.current;
@@ -103,7 +110,7 @@ export function HandTrackingDriver() {
         if (hand.pinch) { context.strokeStyle = "#63e08d"; context.lineWidth = 2; context.beginPath(); context.arc((px(4) + px(8)) / 2, (py(4) + py(8)) / 2, 7, 0, Math.PI * 2); context.stroke(); }
         context.font = "600 9px system-ui";
         context.fillStyle = "#eafcff";
-        const label = `${hand.handedness} · ${hand.pinch ? "Pinch" : hand.gesture?.replace(/_/g, " ") || "Hand"}`;
+        const label = `${hand.side} · ${hand.pinch ? "Pinch" : hand.gesture?.replace(/_/g, " ") || "Hand"}`;
         context.fillText(label, Math.min(px(0), overlay.width - context.measureText(label).width - 3), Math.min(py(0) + 12, overlay.height - 4));
       }
     };
@@ -114,30 +121,60 @@ export function HandTrackingDriver() {
       if (stopped || !video || !recognizer || video.readyState < 2 || video.currentTime === lastVideoTime) return;
       lastVideoTime = video.currentTime;
       const now = performance.now();
+      const dt = lastNow ? (now - lastNow) / 1000 : 0;
+      lastNow = now;
       const result = recognizer.recognizeForVideo(video, now);
-      const hands = assignSides(result.landmarks.slice(0, 2).map((landmarks, i) => {
+
+      const detected = assignSides(result.landmarks.slice(0, 2).map((landmarks, i) => ({
+        handedness: result.handedness[i]?.[0]?.categoryName ?? "Right",
+        rawGesture: result.gestures[i]?.[0]?.categoryName ?? "",
+        landmarks,
+        world: result.worldLandmarks[i] ?? landmarks,
+      })));
+      for (const side of ["Right", "Left"] as const) {
+        if (!detected.some(hand => hand.side === side)) { filters[side].image.reset(); filters[side].world.reset(); }
+      }
+      const hands: TrackedHand[] = detected.map(hand => {
+        const landmarks = filters[hand.side].image.apply(hand.landmarks, dt);
+        const world = filters[hand.side].world.apply(hand.world, dt);
+        const raw = hand.rawGesture === "None" ? "" : hand.rawGesture;
+        const gestureName = raw || classifyPose(landmarks, world);
         const size = Math.hypot(landmarks[9].x - landmarks[0].x, landmarks[9].y - landmarks[0].y) || 1;
-        const gestureName = result.gestures[i]?.[0]?.categoryName ?? "";
+        // thumbs-up/fist also put the thumb tip near the index tip — the
+        // distance test alone misread them as a pinch and masked the gesture
+        const pinchable = !["Thumb_Up", "Thumb_Down", "Closed_Fist"].includes(gestureName);
         return {
-          handedness: result.handedness[i]?.[0]?.categoryName ?? "Right",
-          gesture: gestureName === "None" ? "" : gestureName,
-          pinch: Math.hypot(landmarks[4].x - landmarks[8].x, landmarks[4].y - landmarks[8].y) < size * PINCH_RATIO,
+          handedness: hand.handedness,
+          gesture: gestureName,
+          pinch: pinchable && Math.hypot(landmarks[4].x - landmarks[8].x, landmarks[4].y - landmarks[8].y) < size * PINCH_RATIO,
           pointer: { x: 1 - landmarks[8].x, y: landmarks[8].y },
           landmarks,
+          world,
+          side: hand.side,
         };
-      }));
+      });
+      drawOverlay(hands);
+
+      if (!handStore.workspace) {
+        // calibration: hold an open palm at a comfortable distance; its median
+        // apparent size anchors the depth mapping to this user's own reach
+        const palm = hands.find(hand => hand.gesture === "Open_Palm");
+        if (palm) calSizes.push(Math.hypot(palm.landmarks[9].x - palm.landmarks[0].x, palm.landmarks[9].y - palm.landmarks[0].y));
+        if (calSizes.length >= CALIBRATION_FRAMES) {
+          const rest = [...calSizes].sort((a, b) => a - b)[calSizes.length >> 1];
+          handStore.workspace = { ...WORKSPACE, sizeFar: rest * .6, sizeNear: rest * 1.55 };
+          setPhase("active");
+        } else {
+          setGesture(`${Math.round(calSizes.length / CALIBRATION_FRAMES * 100)}%`);
+        }
+        return; // hands stay parked until calibrated
+      }
+
       handStore.hands = hands;
       handStore.at = now;
-      const pinching = hands.find(hand => hand.pinch);
-      handStore.gripSide = pinching ? pinching.side : null;
       setGesture(hands.length
         ? hands.map(hand => `${hand.side[0]}·${hand.pinch ? "Pinch" : hand.gesture?.replace(/_/g, " ") || "Hand"}`).join("  ")
         : "No hands");
-      drawOverlay(hands);
-      if (hands.length && hands.every(hand => hand.gesture === "Open_Palm" && !hand.pinch)) {
-        openSince ||= now;
-        if (now - openSince > RELEASE_MS && simRef.current.selectedTool) { simRef.current.releaseTool(); openSince = 0; }
-      } else openSince = 0;
     };
 
     (async () => {
@@ -156,13 +193,14 @@ export function HandTrackingDriver() {
           baseOptions: { modelAssetPath: MODEL_PATH, delegate },
           runningMode: "VIDEO" as const,
           numHands: 2,
+          cannedGesturesClassifierOptions: { scoreThreshold: .4 }, // default misses casual thumbs-up
         });
         recognizer = await GestureRecognizer.createFromOptions(fileset, options("GPU"))
           .catch(() => GestureRecognizer.createFromOptions(fileset, options("CPU")));
         if (stopped || !videoRef.current) return;
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
-        setPhase("active");
+        setPhase(handStore.workspace ? "active" : "calibrating");
         rafId = requestAnimationFrame(tick);
       } catch {
         if (!stopped) setPhase("offline");
@@ -175,77 +213,117 @@ export function HandTrackingDriver() {
       stream?.getTracks().forEach(track => track.stop());
       recognizer?.close();
       handStore.hands = [];
-      handStore.gripSide = null;
     };
   }, []);
 
-  const label = phase === "starting" ? "Starting camera…" : phase === "denied" ? "Camera blocked" : phase === "offline" ? "Tracking failed to load" : "Hand tracking";
-  return <div className={`gesture-pip${phase === "active" ? "" : " offline"}`}>
+  const label = phase === "starting" ? "Starting camera…"
+    : phase === "denied" ? "Camera blocked"
+    : phase === "offline" ? "Tracking failed to load"
+    : phase === "calibrating" ? "Show an open palm ✋"
+    : "Hand tracking";
+  return <div className={`gesture-pip${phase === "active" || phase === "calibrating" ? "" : " offline"}`}>
     <div className="gesture-pip-feed">
       <video ref={videoRef} muted playsInline />
       <canvas ref={overlayRef} width={204} height={153} />
     </div>
-    <div><i /><span>{label}</span>{phase === "active" && <strong>{gesture}</strong>}</div>
+    <div><i /><span>{label}</span>{(phase === "active" || phase === "calibrating") && <strong>{gesture}</strong>}</div>
   </div>;
 }
 
-const TOOL_ASSETS: Record<string, string> = {
-  "Needle holder": MODEL_PATHS.needleHolder,
-  Forceps: MODEL_PATHS.forceps,
-  "Surgical scissors": MODEL_PATHS.scissors,
-  "Curved needle": MODEL_PATHS.curvedNeedle,
+const FINGER_NAMES = ["thumb", "index", "middle", "ring", "pinky"] as const;
+type FingerName = typeof FINGER_NAMES[number];
+type FingerRig = {
+  joints: { bone: THREE.Object3D; rest: THREE.Quaternion }[];
+  parentRest: THREE.Quaternion; // rig-space orientation of the chain's parent (static: palm bones aren't driven)
 };
 
-const basisQuat = (across: THREE.Vector3, forward: THREE.Vector3, up: THREE.Vector3) =>
-  new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(across, forward, up));
+const basisQuat = (across: THREE.Vector3, up: THREE.Vector3, forward: THREE.Vector3) =>
+  new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(across, up, forward));
 
+// per-frame scratch — the pose loop allocates nothing
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+const segDir = new THREE.Vector3();
+const vAcross = new THREE.Vector3();
+const vUp = new THREE.Vector3();
+const vForward = new THREE.Vector3();
+const liveBasis = new THREE.Matrix4();
+const liveQuat = new THREE.Quaternion();
+const parentQuat = new THREE.Quaternion();
+const invQuat = new THREE.Quaternion();
+const targetQuat = new THREE.Quaternion();
 /** Both surgeon hands, each independently driven by its detected counterpart. */
 export function GestureHand() {
   return <>
-    <ModelErrorBoundary fallback={<group />}><Suspense fallback={<group />}><TrackedGLBHand side="Right" /></Suspense></ModelErrorBoundary>
-    <ModelErrorBoundary fallback={<group />}><Suspense fallback={<group />}><TrackedGLBHand side="Left" /></Suspense></ModelErrorBoundary>
+    <ModelErrorBoundary fallback={<group />}><Suspense fallback={<group />}><RiggedHand side="Right" /></Suspense></ModelErrorBoundary>
+    <ModelErrorBoundary fallback={<group />}><Suspense fallback={<group />}><RiggedHand side="Left" /></Suspense></ModelErrorBoundary>
   </>;
 }
 
-/** One hand from hand.glb, visible only while MediaPipe reports that side. */
-function TrackedGLBHand({ side }: { side: Side }) {
+/**
+ * One hand from hand.glb, skeleton driven joint-by-joint from MediaPipe:
+ * palm orientation from the landmark basis, and every phalanx (thumb
+ * included) aimed at its own landmark segment — individual finger bends,
+ * spread, and thumb opposition all reproduce 1:1. Bone names in the asset are
+ * generic, so fingers are identified from rest geometry: the thumb is the
+ * 3-bone chain, and the rest order by distance from it.
+ */
+function RiggedHand({ side }: { side: Side }) {
   const { scene } = useGLTF(MODEL_PATHS.hand);
   const root = useRef<THREE.Group>(null);
   const rot = useRef<THREE.Group>(null);
-  const park = PARK[side];
+  const wasLive = useRef(false);
   const axes = useRef({
-    x: { value: park.x, velocity: 0 },
-    y: { value: park.y, velocity: 0 },
-    z: { value: park.z, velocity: 0 },
-    grip: { value: 0, velocity: 0 },
+    x: { value: 0, velocity: 0 },
+    y: { value: WORKSPACE.floorY, velocity: 0 },
+    z: { value: 0, velocity: 0 },
   });
-  const { state } = useSimulation();
-  const toolPath = state.selectedTool ? TOOL_ASSETS[state.selectedTool] : undefined;
 
-  const hand = useMemo(() => {
-    const armatures = scene.children.filter(child => {
-      let skinned = false;
-      child.traverse(object => { if (object instanceof THREE.SkinnedMesh) skinned = true; });
-      return skinned;
-    }).sort((a, b) => a.position.x - b.position.x);
-    const source = (side === "Right" ? armatures[0] : armatures.at(-1)) ?? armatures[0] ?? scene.children[0];
-    if (!source) return new THREE.Group();
-    const model = cloneSkeleton(source);
-    model.position.set(0, 0, 0);
-    model.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(model);
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    const scale = HAND_LENGTH / (Math.max(size.x, size.y, size.z) || 1);
-    model.scale.multiplyScalar(scale);
-    model.position.copy(center).multiplyScalar(-scale);
-    model.traverse(object => {
-      if (!(object instanceof THREE.Mesh)) return;
-      object.castShadow = true;
-      object.receiveShadow = true;
-      object.frustumCulled = false;
+  const { rig, restQuatInv, restPalm, fingers } = useMemo(() => {
+    // the GLB holds both hands; the right one rests on the +x side
+    const sources = scene.children
+      .filter(child => { let skinned = false; child.traverse(o => { if ((o as THREE.SkinnedMesh).isSkinnedMesh) skinned = true; }); return skinned; })
+      .sort((a, b) => a.position.x - b.position.x);
+    const rig = cloneSkeleton(sources[side === "Right" ? sources.length - 1 : 0] ?? scene.children[0]);
+    rig.position.set(0, 0, 0);
+    rig.updateMatrixWorld(true);
+    let mesh: THREE.SkinnedMesh | undefined;
+    rig.traverse(object => {
+      if ((object as THREE.SkinnedMesh).isSkinnedMesh) mesh = object as THREE.SkinnedMesh;
+      if ((object as THREE.Mesh).isMesh) { object.castShadow = true; object.frustumCulled = false; }
     });
-    return model;
+    const wrist = mesh!.skeleton.bones[0];
+    // each child of the wrist starts one finger chain: metacarpal + phalanges
+    const chains = wrist.children.map(start => {
+      const chain: THREE.Object3D[] = [start];
+      while (chain[chain.length - 1].children[0]) chain.push(chain[chain.length - 1].children[0]);
+      return chain;
+    });
+    const at = (o: THREE.Object3D) => o.getWorldPosition(new THREE.Vector3());
+    const thumb = chains.find(chain => chain.length === 3) ?? chains[0];
+    const byGap = chains.filter(chain => chain !== thumb)
+      .map(chain => ({ chain, gap: at(chain[1]).distanceTo(at(thumb[1])) }))
+      .sort((a, b) => a.gap - b.gap);
+    const chainOf: Record<FingerName, THREE.Object3D[]> = {
+      thumb, index: byGap[0].chain, middle: byGap[1].chain, ring: byGap[2].chain, pinky: byGap[3].chain,
+    };
+    // rest palm basis from the rig's own knuckles — same construction as the
+    // live landmark basis, so live-over-rest transfers the pose exactly
+    const wristAt = at(wrist);
+    const forward = at(chainOf.middle[1]).sub(wristAt).normalize();
+    const up = new THREE.Vector3().crossVectors(forward, at(chainOf.index[1]).sub(at(chainOf.pinky[1])).normalize()).normalize();
+    const across = new THREE.Vector3().crossVectors(up, forward).normalize();
+    // wrist → middle fingertip sets the on-screen hand size, wrist is the pivot
+    const middleTip = chainOf.middle[chainOf.middle.length - 1];
+    const span = wristAt.distanceTo(at(middleTip)) * 1.15 || 1;
+    rig.scale.multiplyScalar(HAND_LENGTH / span);
+    rig.updateMatrixWorld(true);
+    rig.position.copy(at(wrist)).negate();
+    const fingers = {} as Record<FingerName, FingerRig>;
+    for (const name of FINGER_NAMES) {
+      const joints = chainOf[name].slice(-3).map(bone => ({ bone, rest: bone.quaternion.clone() }));
+      fingers[name] = { joints, parentRest: joints[0].bone.parent!.getWorldQuaternion(new THREE.Quaternion()) };
+    }
+    return { rig, restQuatInv: basisQuat(across, up, forward).invert(), restPalm: { across, up, forward }, fingers };
   }, [scene, side]);
 
   useFrame((_, delta) => {
@@ -253,46 +331,60 @@ function TrackedGLBHand({ side }: { side: Side }) {
     const rotGroup = rot.current;
     if (!group || !rotGroup) return;
     const fresh = performance.now() - handStore.at < STALE_MS;
-    const live = fresh ? handStore.hands.find(hand => (FLIP_HANDEDNESS ? (hand.side === "Right" ? "Left" : "Right") : hand.side) === side) ?? null : null;
+    const live = fresh ? handStore.hands.find(hand => hand.side === side) ?? null : null;
     group.visible = Boolean(live);
-    if (!live) return;
-    const pose = palmPose(live);
+    if (!live) { wasLive.current = false; return; }
+    const pose = palmPose(live, handStore.workspace ?? WORKSPACE);
     const a = axes.current;
-    // stiff springs: tracking is realtime now, so follow tightly and let the
+
+    vAcross.set(pose.axes.across[0], pose.axes.across[1], pose.axes.across[2]);
+    vUp.set(pose.axes.up[0], pose.axes.up[1], pose.axes.up[2]);
+    vForward.set(pose.axes.forward[0], pose.axes.forward[1], pose.axes.forward[2]);
+    liveQuat.setFromRotationMatrix(liveBasis.makeBasis(vAcross, vUp, vForward)).multiply(restQuatInv);
+
+    if (!wasLive.current) { // reappearing: snap to the hand, don't fly in
+      wasLive.current = true;
+      a.x.value = pose.x; a.y.value = pose.y; a.z.value = pose.z;
+      a.x.velocity = a.y.velocity = a.z.velocity = 0;
+      rotGroup.quaternion.copy(liveQuat);
+    }
+    // stiff springs: tracking is realtime, so follow tightly and let the
     // damping kill jitter rather than adding visible lag
     springStep(a.x, pose.x, delta, 170, 26);
     springStep(a.y, pose.y, delta, 170, 26);
     springStep(a.z, pose.z, delta, 170, 26);
-    springStep(a.grip, pose.grip, delta, 40, 12);
     group.position.set(a.x.value, Math.max(a.y.value, WORKSPACE.floorY), a.z.value);
+    rotGroup.quaternion.slerp(liveQuat, damp(20, delta));
 
-    if (pose.axes) {
-      const target = basisQuat(
-        new THREE.Vector3(...pose.axes.across),
-        new THREE.Vector3(...pose.axes.forward),
-        new THREE.Vector3(...pose.axes.up),
-      );
-      rotGroup.quaternion.slerp(target, damp(14, delta));
+    // skeletal retargeting: aim every phalanx at its landmark segment,
+    // expressed in the palm basis so it composes with the hand orientation
+    const dirs = fingerDirs(live.world, pose.axes) as Record<FingerName, [number, number, number][]>;
+    const blend = damp(26, delta);
+    for (const name of FINGER_NAMES) {
+      const { joints, parentRest } = fingers[name];
+      const fdirs = dirs[name];
+      parentQuat.copy(parentRest);
+      for (let j = 0; j < joints.length; j++) {
+        const bone = joints[j].bone;
+        const c = fdirs[j];
+        segDir.set(0, 0, 0)
+          .addScaledVector(restPalm.across, c[0])
+          .addScaledVector(restPalm.up, c[1])
+          .addScaledVector(restPalm.forward, c[2]);
+        if (segDir.lengthSq() < 1e-6) segDir.copy(Y_AXIS); else segDir.normalize();
+        segDir.applyQuaternion(invQuat.copy(parentQuat).invert());
+        targetQuat.setFromUnitVectors(Y_AXIS, segDir); // bones point along +Y
+        bone.quaternion.slerp(targetQuat, blend);
+        parentQuat.multiply(bone.quaternion);
+      }
     }
   });
 
-  return <group ref={root} visible={false} position={[park.x, park.y, park.z]}>
+  return <group ref={root} visible={false}>
     <group ref={rot}>
-      <primitive object={hand} />
-      {toolPath && <GrippedTool path={toolPath} side={side} axesRef={axes} />}
+      <primitive object={rig} />
     </group>
   </group>;
 }
 
-type AxesRef = React.RefObject<{ grip: { value: number } }>;
-
-/** Instrument held in the palm — visible only while this hand is the one pinching. */
-function GrippedTool({ path, side, axesRef }: { path: string; side: Side; axesRef: AxesRef }) {
-  const holder = useRef<THREE.Group>(null);
-  useFrame(() => {
-    if (holder.current) holder.current.visible = handStore.gripSide === side && (axesRef.current?.grip.value ?? 0) > .5;
-  });
-  return <group ref={holder} visible={false}>
-    <SafeMedicalGLB path={path} targetSize={.62} color="#bcc8cc" metalness={.84} roughness={.2} preserveTextures={false} position={[0, .22, .08]} rotation={[Math.PI / 2, 0, 0]} fallback={<group />} />
-  </group>;
-}
+useGLTF.preload(MODEL_PATHS.hand);

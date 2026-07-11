@@ -19,7 +19,7 @@ const createInitialState = (): SimulationState => ({
   vitals: { heartRate: 88, systolic: 122, diastolic: 78, oxygenSaturation: 98, respiratoryRate: 16, temperature: 36.8 },
   feedback: [{ id: "ready", tone: "info", title: "Case briefing ready", message: "Review the objective and choose an input method to begin.", timestamp: 0 }],
   anatomyOverlay: false,
-  trackingOverlay: false,
+  trackingOverlay: true, // POV hands on by default — the surgeon sees their own hands
   stitchPhase: 0,
   suturePosition: 22,
   sutureAngle: 68,
