@@ -12,10 +12,11 @@ test("server-renders the immersive simulation shell", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /Forearm Laceration/);
+  assert.match(html, /Forearm Nerve Repair/);
   assert.match(html, /Alex Morgan/);
   assert.match(html, /AI Coach/);
   assert.doesNotMatch(html, /No headset required|How it works|Launch Prototype/);
+  assert.doesNotMatch(html, /Trace the incision path|Begin controlled incision|Confirm incision/);
 });
 
 test("renders an honest launcher and an empty debrief before training", async () => {

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { WORKSPACE, damp, fingerCurls, fingerDirs, palmPose, patientSurfaceYAt, rangeValueAt, relativeCursorAt, springStep, stablePinch } from "../lib/handPhysics.mjs";
+import { WORKSPACE, damp, fingerCurls, fingerDirs, guidedCameraMode, handProjectionDistance, incisionSegmentAt, insideSurgeryWindow, palmPose, patientSurfaceYAt, rangeValueAt, rayPlaneDistance, relativeCursorAt, requiredSurgeryTools, springStep, stablePinch } from "../lib/handPhysics.mjs";
 
 // flat hand facing the camera: wrist below knuckles, index left of pinky (right hand)
 function flatHand(over = {}) {
@@ -182,4 +182,40 @@ test("stablePinch emits one press and one release per stable gesture", () => {
   assert.equal(next.event, null);
   next = stablePinch(next.state, false);
   assert.equal(next.event, "release");
+});
+
+test("incision contact only resolves on the forearm guide and respects direction bins", () => {
+  assert.equal(incisionSegmentAt({ x: 0, y: .055, z: -.29 }), 0);
+  assert.equal(incisionSegmentAt({ x: 0, y: .055, z: .29 }), 3);
+  assert.equal(incisionSegmentAt({ x: .08, y: .055, z: 0 }), -1);
+  assert.equal(incisionSegmentAt({ x: 0, y: -.02, z: 0 }), -1);
+});
+
+test("surgical contact rejects points outside the exposed tissue window", () => {
+  assert.equal(insideSurgeryWindow({ x: 0, y: .06, z: 0 }), true);
+  assert.equal(insideSurgeryWindow({ x: .3, y: .06, z: 0 }), false);
+  assert.equal(insideSurgeryWindow({ x: 0, y: .3, z: 0 }), false);
+});
+
+test("guided surgery camera alternates between tool pickup and the operative field", () => {
+  assert.equal(guidedCameraMode(4, 0, [], true), "tray");
+  assert.equal(guidedCameraMode(5, 0, [], true), "tray");
+  assert.equal(guidedCameraMode(5, 0, ["Scalpel"], true), "closeup");
+  assert.equal(guidedCameraMode(6, 4, ["Needle holder"], true), "tray");
+  assert.equal(guidedCameraMode(6, 4, ["Needle holder", "Forceps"], true), "closeup");
+  assert.equal(guidedCameraMode(7, 6, [], true), "closeup");
+  assert.deepEqual(requiredSurgeryTools(6, 0), ["Forceps"]);
+  assert.deepEqual(requiredSurgeryTools(6, 4), ["Needle holder", "Forceps"]);
+  assert.deepEqual(requiredSurgeryTools(6, 5), ["Surgical scissors"]);
+});
+
+test("tray projection intersects the instrument surface in front of the camera", () => {
+  assert.equal(rayPlaneDistance(2.9, -1, 1.18), 1.72);
+  assert.equal(rayPlaneDistance(2.9, 0, 1.18), null);
+  assert.ok(Math.abs(rayPlaneDistance(1, 1, 1.18) - .18) < 1e-9);
+});
+
+test("procedure close-up uses a near hand workspace instead of room depth", () => {
+  assert.ok(handProjectionDistance("closeup", .5) < 1.1);
+  assert.ok(handProjectionDistance("room", .5) > 4);
 });

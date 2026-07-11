@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Activity, Check, Clock3, Crosshair, Hand, Layers3, MousePointer2, ScanLine, ShieldCheck, Sparkles, Stethoscope, Target } from "lucide-react";
 import { SimulationTopbar } from "@/components/simulation/SimulationTopbar";
@@ -9,14 +9,16 @@ import { ProcedurePanel } from "@/components/simulation/ProcedurePanel";
 import { ToolBar } from "@/components/simulation/ToolBar";
 import { HospitalScene } from "@/components/simulation/HospitalScene";
 import { useSimulation } from "@/components/simulation/SimulationProvider";
-import { useSurgicalAudio } from "@/components/simulation/SurgicalAudio";
-import { procedureSteps, stitchActions, stitchPhaseLabels } from "@/data/simulationData";
+import { procedureSteps, stitchPhaseLabels } from "@/data/simulationData";
+import { INCISION_SEGMENTS } from "@/lib/handPhysics.mjs";
 import "./simulation.css";
 
 export default function SimulationPage() {
   const { state } = useSimulation();
+  const router = useRouter();
   const objective = procedureSteps[state.currentStep];
   const handsOn = state.currentStep >= 5;
+  useEffect(() => { if (state.runStatus === "complete") router.push("/results"); }, [router, state.runStatus]);
   return <div className={`simulation-page${handsOn ? " procedure-focus" : ""}${state.trackingOverlay ? " hand-control-mode" : ""}${state.runStatus === "ready" ? " briefing-open" : ""}`}>
     <SimulationTopbar />
     <div className="simulation-body">
@@ -43,75 +45,38 @@ export default function SimulationPage() {
 
 function SimulationBriefing() {
   const { state, startSimulation, toggleTracking, setUiCollapsed } = useSimulation();
-  const [input, setInput] = useState<"mouse" | "tracking">(state.trackingOverlay ? "tracking" : "mouse");
-  const chooseInput = (next: "mouse" | "tracking") => {
-    setInput(next);
-    if ((next === "tracking") !== state.trackingOverlay) toggleTracking();
-    setUiCollapsed(next === "tracking");
-  };
   const begin = () => {
-    if ((input === "tracking") !== state.trackingOverlay) toggleTracking();
-    setUiCollapsed(input === "tracking");
+    if (!state.trackingOverlay) toggleTracking();
+    setUiCollapsed(true);
     startSimulation();
   };
-  return <div className="briefing-overlay"><section className="briefing-card" role="dialog" aria-modal="true" aria-labelledby="briefing-title"><div className="briefing-kicker"><span><Stethoscope size={15} /></span>Case SG-2048 · Bed 04</div><h1 id="briefing-title">Forearm Laceration</h1><p className="briefing-subtitle">Assessment, guided incision control, and one interrupted suture</p><div className="briefing-objective"><Target size={18} /><div><strong>Training objective</strong><p>Follow the clinical sequence, then complete a guided incision and closure exercise directly on the layered virtual patient.</p></div></div><div className="briefing-facts"><span><Clock3 size={14} /><b>18 min</b> expected</span><span><ShieldCheck size={14} /><b>8 stages</b> guided</span><span><Sparkles size={14} /><b>Coach</b> enabled</span></div><fieldset className="input-choice"><legend>Choose input method</legend><button className={input === "mouse" ? "active" : ""} onClick={() => chooseInput("mouse")}><MousePointer2 size={18} /><span><strong>Mouse & touch</strong><small>Recommended for the first attempt</small></span>{input === "mouse" && <Check size={15} />}</button><button className={input === "tracking" ? "active" : ""} onClick={() => chooseInput("tracking")}><Hand size={18} /><span><strong>Hand tracking</strong><small>Camera-based first-person control</small></span>{input === "tracking" && <Check size={15} />}</button></fieldset><button className="begin-simulation" onClick={begin}>Begin patient assessment</button><small className="briefing-disclaimer">Fictional layered patient · Educational simulation · No camera video is stored</small></section></div>;
+  return <div className="briefing-overlay"><section className="briefing-card" role="dialog" aria-modal="true" aria-labelledby="briefing-title"><div className="briefing-kicker"><span><Stethoscope size={15} /></span>Case SG-2048 · Bed 04</div><h1 id="briefing-title">Forearm Nerve Repair</h1><p className="briefing-subtitle">Assessment, nerve exposure, approximation, and guided microsuture repair</p><div className="briefing-objective"><Target size={18} /><div><strong>Training objective</strong><p>Follow the clinical sequence, expose the divided nerve directly on the layered patient, align its ends, and complete a guided repair.</p></div></div><div className="briefing-facts"><span><Clock3 size={14} /><b>18 min</b> expected</span><span><ShieldCheck size={14} /><b>8 stages</b> guided</span><span><Sparkles size={14} /><b>Coach</b> enabled</span></div><fieldset className="input-choice"><legend>Required control mode</legend><button className="active" type="button"><Hand size={18} /><span><strong>Projected-hand control</strong><small>Pinch to grab; real hand and tool contact drive every surgical change</small></span><Check size={15} /></button></fieldset><button className="begin-simulation" onClick={begin}>Enable camera and begin</button><small className="briefing-disclaimer">Fictional layered patient · Educational simulation · No camera video is stored</small></section></div>;
 }
 
 function IncisionInteraction() {
-  const { state, performAction, setIncisionProgress } = useSimulation();
-  const audio = useSurgicalAudio();
-  const hasBegun = state.completedActions.includes("Begin incision");
+  const { state } = useSimulation();
+  const hand = (Object.entries(state.heldTools) as ["Left" | "Right", string | null][]).find(([, tool]) => tool === "Scalpel")?.[0];
   return <div className="procedure-console">
-    <header><div><Crosshair size={14} /><span>Practice incision</span></div><b>Cut control</b></header>
-    <p className="console-instruction">{hasBegun ? "Press and drag the scalpel through the complete guide at one steady pace." : "Select the scalpel, then begin when the virtual forearm is centered."}</p>
-    {hasBegun && <div className="incision-track"><i /><span style={{ width: `${state.incisionProgress * 100}%` }} /><input type="range" min="0" max="1" step="0.01" value={state.incisionProgress} aria-label="Trace the incision path" onPointerDown={audio.playIncision} onPointerUp={audio.stopIncision} onPointerCancel={audio.stopIncision} onChange={event => setIncisionProgress(Number(event.target.value))} /><b style={{ left: `${state.incisionProgress * 100}%` }}><MousePointer2 size={15} /></b></div>}
-    <div className="console-metrics"><span><small>Path coverage</small><strong>{Math.round(state.incisionProgress * 100)}%</strong></span><span><small>Surface</small><strong>Virtual forearm</strong></span><span className={state.incisionProgress >= .95 ? "good" : ""}><small>Control</small><strong>{state.incisionProgress >= .95 ? "Complete" : "In progress"}</strong></span></div>
-    {!hasBegun ? <button className="console-primary" disabled={state.selectedTool !== "Scalpel"} onClick={() => performAction("Begin incision")}>{state.selectedTool === "Scalpel" ? "Begin controlled incision" : "Select scalpel below"}</button> : <button className="console-primary" disabled={state.incisionProgress < .95} onClick={() => { audio.stopIncision(); performAction("Complete incision"); }}>Confirm incision</button>}
+    <header><div><Crosshair size={14} /><span>Live incision contact</span></div><b>{state.surfaceContact ? "CONTACT" : "READY"}</b></header>
+    <p className="console-instruction">{hand ? `Scalpel held by ${hand} hand. Touch the first marker, press gently, and trace toward the final marker.` : "Pinch the scalpel handle on the instrument tray. Cutting is disabled until the tool is physically held."}</p>
+    <div className="motion-progress"><span style={{ width: `${state.incisionProgress * 100}%` }} /><i>{state.incisionComplete ? "Nerve exposed" : `${state.incisionSegments.length}/${INCISION_SEGMENTS} incision contacts`}</i></div>
+    <div className="console-metrics"><span className={hand ? "good" : ""}><small>Instrument</small><strong>{hand ? "Held" : "Pick up"}</strong></span><span className={state.surfaceContact ? "good" : ""}><small>Blade tip</small><strong>{state.surfaceContact ? "On guide" : "Off surface"}</strong></span><span><small>Depth</small><strong>{Math.round(state.incisionDepth * 1000)} mm</strong></span></div>
   </div>;
 }
 
 function SutureInteraction() {
-  const { state, performAction, setSuturePosition, setSutureAngle, setStitchProgress } = useSimulation();
-  const audio = useSurgicalAudio();
-  const router = useRouter();
-  const animation = useRef<number>(0);
-  const [busy, setBusy] = useState(false);
-  useEffect(() => () => cancelAnimationFrame(animation.current), []);
+  const { state } = useSimulation();
   const finalReview = state.currentStep === 7;
-  const nextAction = finalReview ? "Finish procedure" : stitchActions[state.stitchPhase] ?? "Finish procedure";
-  const phaseLabel = finalReview ? "Review stitch" : stitchPhaseLabels[state.stitchPhase];
+  const phaseLabel = finalReview ? "Review nerve repair" : stitchPhaseLabels[state.stitchPhase];
   const inPosition = state.suturePosition >= 43 && state.suturePosition <= 57;
   const goodAngle = state.sutureAngle >= 45 && state.sutureAngle <= 60;
-  const requiredTool = state.stitchPhase === 5 ? "Surgical scissors" : "Needle holder";
-  const toolReady = finalReview || state.selectedTool === requiredTool;
-  const ready = !busy && toolReady && (state.stitchPhase !== 0 || inPosition) && (state.stitchPhase !== 1 || goodAngle);
-  const animate = (duration: number, done: () => void) => {
-    setBusy(true); setStitchProgress(0);
-    const started = performance.now();
-    const tick = (now: number) => {
-      const progress = Math.min(1, (now - started) / duration);
-      setStitchProgress(progress);
-      if (progress < 1) animation.current = requestAnimationFrame(tick);
-      else { setBusy(false); done(); }
-    };
-    animation.current = requestAnimationFrame(tick);
-  };
-  const advance = () => {
-    if (nextAction === "Finish procedure") { performAction(nextAction); window.setTimeout(() => router.push("/results"), 250); return; }
-    if (nextAction === "Position instrument" || nextAction === "Match angle") { performAction(nextAction); return; }
-    if (nextAction === "Begin stitch") audio.playPierce();
-    if (nextAction === "Pull suture") audio.playPull();
-    if (nextAction === "Tie knot") audio.playKnot();
-    if (nextAction === "Cut suture") audio.playSnip();
-    animate(nextAction === "Begin stitch" ? 1250 : nextAction === "Pull suture" ? 950 : 650, () => performAction(nextAction));
-  };
+  const requiredTool = finalReview ? "Free hands + thumbs up" : state.stitchPhase === 0 ? "Forceps" : state.stitchPhase === 4 ? "Needle holder + forceps" : state.stitchPhase === 5 ? "Surgical scissors" : "Needle holder";
+  const held = Object.values(state.heldTools).filter(Boolean).join(" + ") || "None";
   return <div className="procedure-console">
-    <header><div><Sparkles size={14} /><span>Interrupted suture</span></div><b>{finalReview ? "Final review" : `${state.stitchPhase + 1} / ${stitchActions.length}`}</b></header>
+    <header><div><Sparkles size={14} /><span>Direct nerve repair</span></div><b>{state.surfaceContact ? "SURFACE CONTACT" : "HAND CONTROL"}</b></header>
     <div className="phase-title"><span>{finalReview ? <ShieldCheck size={15} /> : <Target size={15} />}</span><div><small>Current phase</small><strong>{phaseLabel}</strong></div></div>
-    {!finalReview && state.stitchPhase === 0 && <div className="position-track"><span className="position-entry"><Target size={12} /></span><i className={inPosition ? "ideal-position active" : "ideal-position"} /><input aria-label="Position the needle holder at the entry zone" type="range" min="4" max="96" step="1" value={state.suturePosition} onChange={event => setSuturePosition(Number(event.target.value))} /><b style={{ left: `${state.suturePosition}%` }}><MousePointer2 size={14} /></b></div>}
-    {!finalReview && state.stitchPhase === 1 && <div className="angle-control"><div><span>Target approach</span><strong>45°–60°</strong></div><div><span>Current angle</span><strong className={goodAngle ? "good" : "warning"}>{state.sutureAngle}°</strong></div><input aria-label="Instrument angle" type="range" min="30" max="85" value={state.sutureAngle} onChange={event => setSutureAngle(Number(event.target.value))} /></div>}
-    {!finalReview && state.stitchPhase >= 2 && <div className="motion-progress"><span style={{ width: `${busy ? state.stitchProgress * 100 : state.stitchPhase > 2 ? 100 : 0}%` }} /><i>{busy ? `${Math.round(state.stitchProgress * 100)}%` : nextAction}</i></div>}
-    <div className="console-metrics"><span className={inPosition ? "good" : ""}><small>Entry</small><strong>{inPosition ? "Aligned" : "Adjust"}</strong></span><span className={goodAngle ? "good" : ""}><small>Angle</small><strong>{goodAngle ? "Safe" : `${state.sutureAngle}°`}</strong></span><span className={state.stitchPhase >= 5 ? "good" : ""}><small>Knot</small><strong>{state.stitchPhase >= 5 ? "Secure" : "Pending"}</strong></span></div>
-    <button className="console-primary" disabled={!ready} onClick={advance}>{busy ? "Movement in progress…" : !toolReady ? `Select ${requiredTool.toLowerCase()} below` : finalReview ? "Complete simulation" : nextAction}</button>
+    <p className="console-instruction">{finalReview ? "Release both instruments, then hold a thumbs-up gesture to approve the completed repair." : `Pick up ${requiredTool.toLowerCase()} and perform the movement over the highlighted tissue target.`}</p>
+    {!finalReview && state.stitchPhase >= 2 && <div className="motion-progress"><span style={{ width: `${state.stitchProgress * 100}%` }} /><i>{Math.round(state.stitchProgress * 100)}% movement captured</i></div>}
+    <div className="console-metrics"><span className={held !== "None" ? "good" : ""}><small>Held tools</small><strong>{held}</strong></span><span className={inPosition ? "good" : ""}><small>Nerve ends</small><strong>{inPosition ? "Aligned" : "Open"}</strong></span><span className={goodAngle ? "good" : ""}><small>Live angle</small><strong>{goodAngle ? `${state.sutureAngle}° safe` : `${state.sutureAngle}°`}</strong></span></div>
   </div>;
 }

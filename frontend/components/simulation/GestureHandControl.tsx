@@ -11,7 +11,7 @@ import { useSimulation } from "./SimulationProvider";
 import { MODEL_PATHS } from "@/data/modelConfig";
 import { procedureSteps } from "@/data/simulationData";
 import type { CameraMode } from "@/types/simulation";
-import { LandmarkFilter, WORKSPACE, classifyPose, damp, fingerDirs, palmPose, rangeValueAt, relativeCursorAt, sceneSurfaceYAt, springStep, stablePinch } from "@/lib/handPhysics.mjs";
+import { LandmarkFilter, WORKSPACE, classifyPose, damp, fingerDirs, handProjectionDistance, palmPose, rangeValueAt, rayPlaneDistance, relativeCursorAt, sceneSurfaceYAt, springStep, stablePinch } from "@/lib/handPhysics.mjs";
 import { MotionTracker, motionStats } from "@/lib/handMetrics.mjs";
 
 type Landmark = { x: number; y: number; z: number };
@@ -39,12 +39,13 @@ export type HandWorldState = {
   velocity: THREE.Vector3;
   reach: number;
   holding: boolean;
+  contactLift: number;
 };
 
 const emptyHandWorld = (): HandWorldState => ({
   live: false, pinch: false, gesture: "",
   position: new THREE.Vector3(), quaternion: new THREE.Quaternion(),
-  pinchPoint: new THREE.Vector3(), velocity: new THREE.Vector3(), reach: 0, holding: false,
+  pinchPoint: new THREE.Vector3(), velocity: new THREE.Vector3(), reach: 0, holding: false, contactLift: 0,
 });
 
 /** World-space pose of each rendered surgeon hand, written per frame by RiggedHand for the physics layer. */
@@ -61,18 +62,18 @@ export const handStore: {
 const WASM_PATH = "/mediapipe/wasm";
 const MODEL_PATH = "/mediapipe/gesture_recognizer.task";
 const STALE_MS = 400; // no detection for this long → hand fades out
-const PINCH_RATIO = .35; // thumb→index tip distance relative to hand size
+const PINCH_PRESS_RATIO = .32;
+const PINCH_RELEASE_RATIO = .42;
 const HAND_LENGTH = .62; // wrist → middle fingertip, world units
 const CALIBRATION_FRAMES = 40;
 const FILTER_CUTOFF = 1.2;
 const FILTER_BETA = 5;
 
 function assignSides<T extends { handedness: string; landmarks: Landmark[] }>(hands: T[]): (T & { side: Side })[] {
-  if (hands.length === 2) {
-    const sorted = [...hands].sort((a, b) => a.landmarks[0].x - b.landmarks[0].x);
-    return [{ ...sorted[0], side: "Right" as const }, { ...sorted[1], side: "Left" as const }];
-  }
-  return hands.map(hand => ({ ...hand, side: hand.handedness === "Left" ? "Right" as const : "Left" as const }));
+  const labeled = hands.map(hand => ({ ...hand, side: hand.handedness === "Left" ? "Right" as const : "Left" as const }));
+  if (new Set(labeled.map(hand => hand.side)).size === labeled.length) return labeled;
+  const sorted = [...hands].sort((a, b) => a.landmarks[0].x - b.landmarks[0].x);
+  return sorted.map((hand, index) => ({ ...hand, side: index === 0 ? "Right" as const : "Left" as const }));
 }
 
 const HAND_CONNECTIONS = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12], [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [17, 18], [18, 19], [19, 20], [0, 17]] as const;
@@ -84,21 +85,17 @@ type PinchState = { active: boolean; candidate: boolean; frames: number };
 const CONTROL_SELECTOR = 'button:not(:disabled),a[href],input[type="range"],[role="button"]:not([aria-disabled="true"])';
 
 // Radial command menu — each entry is a scene view (incl. zoom), an instrument, or a toggle.
-type MenuItem = { label: string } & ({ view: CameraMode } | { tool: string } | { toggle: true });
+type MenuItem = { label: string } & ({ view: CameraMode } | { toggle: true });
 const HAND_MENU: MenuItem[] = [
   { label: "Zoom in", view: "closeup" },
   { label: "Zoom out", view: "room" },
   { label: "Patient", view: "patient" },
   { label: "Anatomy", toggle: true },
-  { label: "Needle holder", tool: "Needle holder" },
-  { label: "Forceps", tool: "Forceps" },
-  { label: "Scissors", tool: "Surgical scissors" },
-  { label: "Curved needle", tool: "Curved needle" },
 ];
 
 // Shared UI-interaction state the physics layer reads: while the wheel is open,
 // a pinch selects a menu item, so grabbing is suppressed to avoid double meaning.
-export const interactionState = { menuOpen: false };
+export const interactionState = { menuOpen: false, surgeryActive: false };
 
 function controlLabel(target: HTMLElement | null) {
   if (!target) return "";
@@ -121,7 +118,7 @@ function setRangeFromPointer(input: HTMLInputElement, clientX: number) {
 
 
 export function HandTrackingDriver() {
-  const { state, setCameraMode, selectTool, toggleAnatomy } = useSimulation();
+  const { state, setCameraMode, toggleAnatomy } = useSimulation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
@@ -136,17 +133,17 @@ export function HandTrackingDriver() {
   const [menuHighlight, setMenuHighlight] = useState(-1);
   const menuOpenRef = useRef(false);
   useEffect(() => { menuOpenRef.current = menuOpen; interactionState.menuOpen = menuOpen; }, [menuOpen]);
-  // captured fresh each render so the tick loop commits with live actions
+  useEffect(() => { interactionState.surgeryActive = state.currentStep >= 4; return () => { interactionState.surgeryActive = false; }; }, [state.currentStep]);
   const commitRef = useRef<(i: number) => void>(() => {});
-  commitRef.current = (i: number) => {
-    const item = HAND_MENU[i];
-    if (!item) return;
-    if ("view" in item) setCameraMode(item.view);
-    else if ("tool" in item) selectTool(item.tool);
-    else toggleAnatomy();
-    setMenuOpen(false);
-    setMenuHighlight(-1);
-  };
+  useEffect(() => { commitRef.current = (i: number) => {
+      const item = HAND_MENU[i];
+      if (!item) return;
+      if ("view" in item) setCameraMode(item.view);
+      else toggleAnatomy();
+      setMenuOpen(false);
+      setMenuHighlight(-1);
+    };
+  }, [setCameraMode, toggleAnatomy]);
 
   useEffect(() => {
     const cursorNode = cursorRef.current;
@@ -179,6 +176,10 @@ export function HandTrackingDriver() {
     const filters: Record<Side, { image: LandmarkFilter; world: LandmarkFilter }> = {
       Right: { image: new LandmarkFilter(FILTER_CUTOFF, FILTER_BETA), world: new LandmarkFilter(FILTER_CUTOFF, FILTER_BETA) },
       Left: { image: new LandmarkFilter(FILTER_CUTOFF, FILTER_BETA), world: new LandmarkFilter(FILTER_CUTOFF, FILTER_BETA) },
+    };
+    const gesturePinch: Record<Side, PinchState> = {
+      Right: { active: false, candidate: false, frames: 0 },
+      Left: { active: false, candidate: false, frames: 0 },
     };
 
     const drawOverlay = (hands: TrackedHand[]) => {
@@ -223,6 +224,7 @@ export function HandTrackingDriver() {
     };
 
     const updateHandControl = (hands: TrackedHand[]) => {
+      if (interactionState.surgeryActive) { clearHandControl(); return; }
       const leftHand = hands.find(item => item.side === "Left");
       const rightHand = hands.find(item => item.side === "Right");
       const cursor = cursorRef.current;
@@ -299,7 +301,10 @@ export function HandTrackingDriver() {
         world: result.worldLandmarks[i] ?? landmarks,
       })));
       for (const side of ["Right", "Left"] as const) {
-        if (!detected.some(hand => hand.side === side)) { filters[side].image.reset(); filters[side].world.reset(); }
+        if (!detected.some(hand => hand.side === side)) {
+          filters[side].image.reset(); filters[side].world.reset();
+          gesturePinch[side] = { active: false, candidate: false, frames: 0 };
+        }
       }
       const hands: TrackedHand[] = detected.map(hand => {
         const landmarks = filters[hand.side].image.apply(hand.landmarks, dt);
@@ -310,10 +315,13 @@ export function HandTrackingDriver() {
         // thumbs-up/fist also put the thumb tip near the index tip — the
         // distance test alone misread them as a pinch and masked the gesture
         const pinchable = !["Thumb_Up", "Thumb_Down", "Closed_Fist"].includes(gestureName);
+        const ratio = Math.hypot(landmarks[4].x - landmarks[8].x, landmarks[4].y - landmarks[8].y) / size;
+        const pinching = pinchable && ratio < (gesturePinch[hand.side].active ? PINCH_RELEASE_RATIO : PINCH_PRESS_RATIO);
+        gesturePinch[hand.side] = stablePinch(gesturePinch[hand.side], pinching, 3).state;
         return {
           handedness: hand.handedness,
           gesture: gestureName,
-          pinch: pinchable && Math.hypot(landmarks[4].x - landmarks[8].x, landmarks[4].y - landmarks[8].y) < size * PINCH_RATIO,
+          pinch: gesturePinch[hand.side].active,
           pointer: { x: 1 - landmarks[8].x, y: landmarks[8].y },
           landmarks,
           world,
@@ -341,7 +349,7 @@ export function HandTrackingDriver() {
       handStore.hands = hands;
       handStore.at = now;
 
-      for (const hand of hands) {
+      for (const hand of interactionState.surgeryActive ? [] : hands) {
         if (hand.pinch && !menuPinchWas[hand.side]) {
           if (now - menuRise[hand.side] < 450) { // double-tap on this hand
             if (menuOpenRef.current) { setMenuOpen(false); menuAnchor = null; menuHand = null; }
@@ -356,6 +364,7 @@ export function HandTrackingDriver() {
         }
         menuPinchWas[hand.side] = hand.pinch;
       }
+      if (interactionState.surgeryActive && menuOpenRef.current) setMenuOpen(false);
       for (const side of ["Left", "Right"] as const) if (!hands.some(hand => hand.side === side)) menuPinchWas[side] = false;
 
       if (menuOpenRef.current) {
@@ -467,7 +476,7 @@ export function HandTrackingDriver() {
       {HAND_MENU.map((item, i) => {
         const angle = (-90 + i * (360 / HAND_MENU.length)) * Math.PI / 180;
         const r = 172;
-        const active = "view" in item ? state.cameraMode === item.view : "tool" in item ? state.selectedTool === item.tool : state.anatomyOverlay;
+        const active = "view" in item ? state.cameraMode === item.view : state.anatomyOverlay;
         return <button key={item.label} className={`hand-menu-item${active ? " active" : ""}${i === menuHighlight ? " aim" : ""}`}
           style={{ left: `calc(50% + ${(Math.cos(angle) * r).toFixed(1)}px)`, top: `calc(50% + ${(Math.sin(angle) * r).toFixed(1)}px)` }}
           onClick={() => commitRef.current(i)}>{item.label}</button>;
@@ -503,17 +512,22 @@ const invQuat = new THREE.Quaternion();
 const targetQuat = new THREE.Quaternion();
 const tipA = new THREE.Vector3();
 const tipB = new THREE.Vector3();
+const contactPoint = new THREE.Vector3();
 const instantVel = new THREE.Vector3();
+const trayNdc = new THREE.Vector2();
+const trayRay = new THREE.Raycaster();
+const trayPoint = new THREE.Vector3();
+const trayOffset = new THREE.Vector3();
 /** Both surgeon hands, each independently driven by its detected counterpart. */
-export function GestureHand() {
+export function GestureHand({ mode }: { mode: Exclude<CameraMode, "webcam"> | "pov" }) {
   return <>
-    <ModelErrorBoundary fallback={<group />}><Suspense fallback={<group />}><RiggedHand side="Right" /></Suspense></ModelErrorBoundary>
-    <ModelErrorBoundary fallback={<group />}><Suspense fallback={<group />}><RiggedHand side="Left" /></Suspense></ModelErrorBoundary>
+    <ModelErrorBoundary fallback={<group />}><Suspense fallback={<group />}><RiggedHand side="Right" mode={mode} /></Suspense></ModelErrorBoundary>
+    <ModelErrorBoundary fallback={<group />}><Suspense fallback={<group />}><RiggedHand side="Left" mode={mode} /></Suspense></ModelErrorBoundary>
   </>;
 }
 
 
-function RiggedHand({ side }: { side: Side }) {
+function RiggedHand({ side, mode }: { side: Side; mode: Exclude<CameraMode, "webcam"> | "pov" }) {
   const { scene } = useGLTF(MODEL_PATHS.hand);
   const { camera } = useThree();
   const root = useRef<THREE.Group>(null);
@@ -525,7 +539,7 @@ function RiggedHand({ side }: { side: Side }) {
     z: { value: -3, velocity: 0 },
   });
 
-  const { rig, restQuatInv, restPalm, fingers, tips } = useMemo(() => {
+  const { rig, restQuatInv, restPalm, fingers, tips, contactTips } = useMemo(() => {
     // the GLB holds both hands; the right one rests on the +x side
     const sources = scene.children
       .filter(child => { let skinned = false; child.traverse(o => { if ((o as THREE.SkinnedMesh).isSkinnedMesh) skinned = true; }); return skinned; })
@@ -572,10 +586,11 @@ function RiggedHand({ side }: { side: Side }) {
     }
     // leaf bones sit at the fingertips — their midpoint is the pinch point
     const tips = { thumb: chainOf.thumb[chainOf.thumb.length - 1], index: chainOf.index[chainOf.index.length - 1] };
-    return { rig, restQuatInv: basisQuat(across, up, forward).invert(), restPalm: { across, up, forward }, fingers, tips };
+    const contactTips = [wrist, ...Object.values(chainOf).map(chain => chain[chain.length - 1])];
+    return { rig, restQuatInv: basisQuat(across, up, forward).invert(), restPalm: { across, up, forward }, fingers, tips, contactTips };
   }, [scene, side]);
   const trackerRef = useRef(new MotionTracker());
-  useEffect(() => () => { handWorld[side].live = false; motionStats[side].live = false; }, [side]);
+  useEffect(() => () => { handWorld[side].live = false; handWorld[side].holding = false; motionStats[side].live = false; }, [side]);
 
   useFrame((_, delta) => {
     const tracker = trackerRef.current;
@@ -600,7 +615,7 @@ function RiggedHand({ side }: { side: Side }) {
     liveQuat.setFromRotationMatrix(liveBasis.makeBasis(vAcross, vUp, vForward)).multiply(restQuatInv);
     worldQuat.copy(camera.quaternion).multiply(liveQuat);
 
-    const distance = 2.6 + pose.screen.depth * 3.2;
+    const distance = handProjectionDistance(mode, pose.screen.depth);
     const perspective = camera as THREE.PerspectiveCamera;
     const halfHeight = Math.tan(THREE.MathUtils.degToRad(perspective.fov || 44) / 2) * distance;
     const targetX = pose.screen.x * halfHeight * (perspective.aspect || 1) * .82;
@@ -651,16 +666,46 @@ function RiggedHand({ side }: { side: Side }) {
       }
     }
 
+    // Align the final retargeted fingertip pose with the tray surface. Doing
+    // this after finger posing prevents the bones from moving the pinch away.
+    if (mode === "tray") {
+      group.updateMatrixWorld(true);
+      tips.thumb.getWorldPosition(tipA);
+      tips.index.getWorldPosition(tipB);
+      tipA.add(tipB).multiplyScalar(.5);
+      const x = 1 - (live.landmarks[4].x + live.landmarks[8].x) / 2;
+      const y = (live.landmarks[4].y + live.landmarks[8].y) / 2;
+      trayNdc.set(x * 2 - 1, 1 - y * 2);
+      trayRay.setFromCamera(trayNdc, camera);
+      const distance = rayPlaneDistance(trayRay.ray.origin.y, trayRay.ray.direction.y, 1.18);
+      if (distance != null) {
+        trayRay.ray.at(distance, trayPoint);
+        trayPoint.x = THREE.MathUtils.clamp(trayPoint.x, 2.18, 3.42);
+        trayPoint.z = THREE.MathUtils.clamp(trayPoint.z, -1, -.24);
+        group.position.add(trayOffset.copy(trayPoint).sub(tipA));
+        group.updateMatrixWorld(true);
+      }
+    }
+
     // publish world-space pose for the physics layer + motion metrics HUD
     const hw = handWorld[side];
     tips.thumb.getWorldPosition(tipA);
     tips.index.getWorldPosition(tipB);
     tipA.add(tipB).multiplyScalar(.5);
-    // collision guard: rest the working fingertips ON whatever solid surface is
-    // under them (body / bed / tray / floor) instead of sinking in — lift the
-    // whole hand by any penetration (stateless per frame, so no drift).
-    const surfaceY = sceneSurfaceYAt(tipA.x, tipA.z);
-    if (tipA.y < surfaceY) { group.position.y += surfaceY - tipA.y; tipA.y = surfaceY; }
+    // Lift the whole hand by its deepest wrist/fingertip/tool penetration.
+    let lift = mode === "tray" ? 0 : hw.contactLift;
+    hw.contactLift = 0;
+    if (mode !== "tray") for (const point of contactTips) {
+        point.getWorldPosition(contactPoint);
+        lift = Math.max(lift, sceneSurfaceYAt(contactPoint.x, contactPoint.z) - contactPoint.y);
+      }
+    if (lift > 0) {
+      group.position.y += lift;
+      group.updateMatrixWorld(true);
+      tips.thumb.getWorldPosition(tipA);
+      tips.index.getWorldPosition(tipB);
+      tipA.add(tipB).multiplyScalar(.5);
+    }
     if (hw.live && delta > 0) {
       instantVel.copy(tipA).sub(hw.pinchPoint).divideScalar(delta);
       hw.velocity.lerp(instantVel, damp(18, delta));
@@ -683,7 +728,7 @@ function RiggedHand({ side }: { side: Side }) {
     motionStats.at = performance.now();
   });
 
-  return <group ref={root} visible={false}>
+  return <group ref={root} visible={false} scale={mode === "closeup" ? .42 : 1}>
     <group ref={rot}>
       <primitive object={rig} />
     </group>

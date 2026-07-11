@@ -30,6 +30,8 @@ export type SimulationState = {
   runStatus: SimulationRunStatus;
   selectedRegion: string | null;
   selectedTool: string | null;
+  heldTools: Record<"Left" | "Right", string | null>;
+  surfaceContact: boolean;
   currentStep: number;
   completedSteps: string[];
   completedActions: string[];
@@ -47,6 +49,10 @@ export type SimulationState = {
   // ── Incision state ──
   /** 0→1 progress along the incision path while the scalpel is cutting. */
   incisionProgress: number;
+  /** Guide segments actually crossed by the held scalpel tip. */
+  incisionSegments: number[];
+  /** Maximum approximated tip penetration in world units. */
+  incisionDepth: number;
   /** True once the full incision is completed. */
   incisionComplete: boolean;
 

@@ -64,6 +64,32 @@ export function sceneSurfaceYAt(x, z) {
   return 1.0;                                                        // room floor
 }
 
+/** Distance along a camera ray to a horizontal interaction surface. */
+export function rayPlaneDistance(originY, directionY, planeY) {
+  if (Math.abs(directionY) < 1e-6) return null;
+  const distance = (planeY - originY) / directionY;
+  return distance >= 0 ? distance : null;
+}
+
+/** Camera-space reach tuned to the active clinical view. */
+export function handProjectionDistance(mode, depth) {
+  const reach = clamp(depth, 0, 1);
+  return mode === "closeup" ? lerp(.78, 1.25, reach) : lerp(2.6, 5.8, reach);
+}
+
+export const INCISION_SEGMENTS = 4;
+
+/** Return the guide segment touched by a real tool tip, or -1 off-surface. */
+export function incisionSegmentAt(point, segments = INCISION_SEGMENTS) {
+  if (Math.abs(point.x) > .055 || point.y < .02 || point.y > .105 || point.z < -.29 || point.z > .29) return -1;
+  return Math.min(segments - 1, Math.floor((point.z + .29) / .58 * segments));
+}
+
+/** Strict local wound contact used by nerve manipulation and microsuturing. */
+export function insideSurgeryWindow(point) {
+  return Math.abs(point.x) <= .24 && Math.abs(point.z) <= .31 && point.y >= .015 && point.y <= .16;
+}
+
 /**
  * Two-frame pinch debounce. Returns a new tiny state object and emits only on
  * stable edges, so holding a pinch cannot repeatedly activate a control.
@@ -77,6 +103,30 @@ export function stablePinch(state, pinching, stableFrames = 2) {
     state: { active: pinching, candidate: pinching, frames },
     event: pinching ? "press" : "release",
   };
+}
+
+/**
+ * During projected-hand surgery the camera follows the work instead of making
+ * the learner reach toward off-screen world geometry. Pick up at the tray,
+ * then move to the operative field as soon as the tools for that phase are held.
+ */
+export function requiredSurgeryTools(step, stitchPhase) {
+  if (step === 5) return ["Scalpel"];
+  if (step !== 6) return [];
+  if (stitchPhase === 0) return ["Forceps"];
+  if (stitchPhase >= 1 && stitchPhase <= 3) return ["Needle holder"];
+  if (stitchPhase === 4) return ["Needle holder", "Forceps"];
+  return ["Surgical scissors"];
+}
+
+export function guidedCameraMode(step, stitchPhase, heldTools, tracking, requestedMode = "room") {
+  if (!tracking) return requestedMode === "webcam" ? "pov" : requestedMode;
+  if (step < 4) return "pov";
+  if (step === 4) return "tray";
+  if (step === 7) return "closeup";
+
+  const required = requiredSurgeryTools(step, stitchPhase);
+  return required.every(tool => heldTools.includes(tool)) ? "closeup" : "tray";
 }
 
 // camera space (x right, y down, z away from camera) → POV world space.

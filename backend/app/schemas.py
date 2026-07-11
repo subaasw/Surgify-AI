@@ -234,6 +234,16 @@ class HintResponse(BaseModel):
     penalty: float = 1
 
 
+class CoachGenerateRequest(BaseModel):
+    message: str
+    metrics: dict[str, float] = {}
+
+
+class CoachGenerateResponse(BaseModel):
+    ai_message: str | None = None
+    audio_data: str | None = None
+
+
 # ---------- results ----------
 
 class ResultEventOut(BaseModel):

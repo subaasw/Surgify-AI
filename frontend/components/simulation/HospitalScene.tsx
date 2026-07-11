@@ -10,9 +10,10 @@ import { useSimulation } from "./SimulationProvider";
 import type { CameraMode } from "@/types/simulation";
 import { MedicalGLB, ModelErrorBoundary, SafeMedicalGLB } from "./ModelRegistry";
 import { GestureHand, HandTrackingDriver, handWorld } from "./GestureHandControl";
-import { SurgicalPhysics, TOOL_ASSETS } from "./HandPhysics";
+import { SurgicalPhysics, TOOL_ASSETS, surgerySite } from "./HandPhysics";
 import { MODEL_PATHS } from "@/data/modelConfig";
 import { WoundSurface } from "./WoundSurface";
+import { guidedCameraMode } from "@/lib/handPhysics.mjs";
 
 const presets: Record<Exclude<CameraMode, "webcam"> | "pov", { position: [number, number, number]; target: [number, number, number] }> = {
   // first-person surgeon view: hands enter from the bottom edge like VR
@@ -21,7 +22,7 @@ const presets: Record<Exclude<CameraMode, "webcam"> | "pov", { position: [number
   patient: { position: [3.35, 3.4, 4.7], target: [0, 1.7, 0] },
   closeup: { position: [-1.3, 2.5, 0.8], target: [-.62, 1.98, .18] },
   anatomy: { position: [3.35, 2.8, 4.2], target: [0, 1.72, .1] },
-  tray: { position: [3.35, 3.3, -.2], target: [2.7, 1.15, -.7] },
+  tray: { position: [3.6, 2.9, .65], target: [2.82, 1.15, -.62] },
 };
 const cameraBounds = { min: new THREE.Vector3(-3.55, .45, -5.95), max: new THREE.Vector3(3.55, 5.1, 6.35) };
 
@@ -39,10 +40,13 @@ export function HospitalScene() {
   const patientProps = { selected: state.selectedRegion, anatomy: state.anatomyOverlay, stitchPhase: state.stitchPhase, selectedTool: state.selectedTool, onSelect: selectRegion };
   const proceduralPatient = <FallbackPatient {...patientProps} />;
   const legacyPatient = <ModelErrorBoundary fallback={proceduralPatient}><Suspense fallback={proceduralPatient}><LoadedLegacyPatient {...patientProps} /></Suspense></ModelErrorBoundary>;
-  return <SceneErrorBoundary>{state.trackingOverlay && <HandTrackingDriver />}<Canvas className="hospital-scene-canvas" shadows dpr={1} camera={{ position: presets.room.position, fov: 44, near: .1, far: 40 }} gl={{ antialias: true }}><color attach="background" args={["#02070b"]} /><fog attach="fog" args={["#091119", 12, 23]} /><ambientLight intensity={.72} /><hemisphereLight args={["#eaf5f7", "#26333a", 1.25]} /><directionalLight castShadow position={[4, 8, 5]} intensity={2.2} color="#f7fbfa" shadow-mapSize={[512, 512]} /><pointLight position={[-4, 3.5, 1]} intensity={1.2} color="#b8dcf2" /><Environment resolution={32}><Lightformer form="rect" intensity={1.2} color="#e9fbff" scale={[8, 3, 1]} position={[0, 6, -1]} rotation={[Math.PI / 2, 0, 0]} /></Environment><CameraRig mode={state.trackingOverlay || state.cameraMode === "webcam" ? "pov" : state.cameraMode} /><SafeMedicalGLB path={MODEL_PATHS.operationTheatre} targetSize={14} preserveMaterials castShadows={false} position={[0,1.66,0]} rotation={[0,Math.PI/2,0]} fallback={<HospitalRoom />} /><SafeMedicalGLB path={MODEL_PATHS.hospitalBed} targetSize={5.35} preserveMaterials position={[0,1.12,0]} fallback={<FallbackHospitalBed />} /><ModelErrorBoundary fallback={legacyPatient}><Suspense fallback={proceduralPatient}><LoadedPatient {...patientProps} /></Suspense></ModelErrorBoundary><FallbackMonitor /><IVStand /><InstrumentTray selectedTool={state.selectedTool} physical={state.trackingOverlay} />{state.trackingOverlay && <GestureHand />}<SurgicalPhysics selectedTool={state.selectedTool} active={state.trackingOverlay} /><ContactShadows frames={1} resolution={192} position={[0, .02, 0]} opacity={.32} scale={15} blur={2.6} far={5} /></Canvas></SceneErrorBoundary>;
+  const heldTools = Object.values(state.heldTools).filter((tool): tool is string => Boolean(tool));
+  const cameraMode = guidedCameraMode(state.currentStep, state.stitchPhase, heldTools, state.trackingOverlay, state.cameraMode) as Exclude<CameraMode, "webcam"> | "pov";
+  const guided = state.trackingOverlay && state.currentStep >= 4;
+  return <SceneErrorBoundary>{state.trackingOverlay && <HandTrackingDriver />}<Canvas className="hospital-scene-canvas" shadows dpr={1} camera={{ position: presets.room.position, fov: 44, near: .1, far: 40 }} gl={{ antialias: true }}><color attach="background" args={["#02070b"]} /><fog attach="fog" args={["#091119", 12, 23]} /><ambientLight intensity={.72} /><hemisphereLight args={["#eaf5f7", "#26333a", 1.25]} /><directionalLight castShadow position={[4, 8, 5]} intensity={2.2} color="#f7fbfa" shadow-mapSize={[512, 512]} /><pointLight position={[-4, 3.5, 1]} intensity={1.2} color="#b8dcf2" /><Environment resolution={32}><Lightformer form="rect" intensity={1.2} color="#e9fbff" scale={[8, 3, 1]} position={[0, 6, -1]} rotation={[Math.PI / 2, 0, 0]} /></Environment><CameraRig mode={cameraMode} locked={guided} /><SafeMedicalGLB path={MODEL_PATHS.operationTheatre} targetSize={14} preserveMaterials castShadows={false} position={[0,1.66,0]} rotation={[0,Math.PI/2,0]} fallback={<HospitalRoom />} /><SafeMedicalGLB path={MODEL_PATHS.hospitalBed} targetSize={5.35} preserveMaterials position={[0,1.12,0]} fallback={<FallbackHospitalBed />} /><ModelErrorBoundary fallback={legacyPatient}><Suspense fallback={proceduralPatient}><LoadedPatient {...patientProps} /></Suspense></ModelErrorBoundary><FallbackMonitor /><IVStand /><InstrumentTray selectedTool={state.selectedTool} physical={state.trackingOverlay} />{state.trackingOverlay && <GestureHand mode={cameraMode} />}<SurgicalPhysics active={state.trackingOverlay} /><ContactShadows frames={1} resolution={192} position={[0, .02, 0]} opacity={.32} scale={15} blur={2.6} far={5} /></Canvas></SceneErrorBoundary>;
 }
 
-function CameraRig({ mode }: { mode: Exclude<CameraMode, "webcam"> | "pov" }) {
+function CameraRig({ mode, locked }: { mode: Exclude<CameraMode, "webcam"> | "pov"; locked: boolean }) {
   const controls = useRef<OrbitControlsImpl>(null);
   const transitioning = useRef(true);
   const povDist = useRef(POV_WIDE);
@@ -93,7 +97,7 @@ function CameraRig({ mode }: { mode: Exclude<CameraMode, "webcam"> | "pov" }) {
     control.update();
     camera.position.clamp(cameraBounds.min, cameraBounds.max);
   });
-  return <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={.08} enablePan minDistance={2.15} maxDistance={7.8} minPolarAngle={.28} maxPolarAngle={1.47} minAzimuthAngle={-1.8} maxAzimuthAngle={1.8} target={presets.room.target} />;
+  return <OrbitControls ref={controls} makeDefault enableDamping dampingFactor={.08} enableRotate={!locked} enablePan={!locked} enableZoom={!locked} minDistance={mode === "closeup" ? .72 : mode === "tray" ? 1.4 : 2.15} maxDistance={7.8} minPolarAngle={.28} maxPolarAngle={1.47} minAzimuthAngle={-1.8} maxAzimuthAngle={1.8} target={presets.room.target} />;
 }
 
 function HospitalRoom() {
@@ -208,6 +212,7 @@ function LoadedPatient({ selected, anatomy, stitchPhase, selectedTool, onSelect 
         {anatomy && <InternalPatientLayers />}
       </group>
       <SurgicalDrape anatomy={anatomy} />
+      {selected === "Right arm" && <WoundTrainingPatch anatomy={anatomy} position={[-.62, .19, .15]} />}
     </group>
     <PatientInteractionZones selected={selected} anatomy={anatomy} stitchPhase={stitchPhase} selectedTool={selectedTool} onSelect={onSelect} />
   </group>;
@@ -216,6 +221,7 @@ function LoadedPatient({ selected, anatomy, stitchPhase, selectedTool, onSelect 
 function LoadedLegacyPatient({ selected, anatomy, stitchPhase, selectedTool, onSelect }: PatientProps) {
   return <group>
     <group position={[0,1.46,-.05]}><MedicalGLB path={MODEL_PATHS.legacyPatient} targetSize={4.35} preserveTextures opacity={anatomy ? .38 : 1} /></group>
+    {selected === "Right arm" && <WoundTrainingPatch anatomy={anatomy} position={[-.62, 1.93, .1]} />}
     <PatientInteractionZones selected={selected} anatomy={anatomy} stitchPhase={stitchPhase} selectedTool={selectedTool} onSelect={onSelect} />
   </group>;
 }
@@ -226,7 +232,7 @@ function PatientInteractionZones({ selected, anatomy, onSelect }: PatientProps) 
     <group position={[0,.1,-.62]}><Region region="Chest" selected={selected} onSelect={onSelect}><mesh rotation={[Math.PI/2,0,0]} scale={[.9,.56,1]}><capsuleGeometry args={[.48,1.05,8,14]} /><HitMaterial /></mesh></Region>{anatomy&&<TorsoAnatomy />}</group>
     <group position={[0,.08,.08]}><Region region="Abdomen" selected={selected} onSelect={onSelect}><mesh rotation={[Math.PI/2,0,0]} scale={[.8,.5,.82]}><capsuleGeometry args={[.45,.72,8,14]} /><HitMaterial /></mesh></Region></group>
     <PatientArmZone label="Left arm" x={.62} selected={selected} onSelect={onSelect} />
-    <PatientArmZone label="Right arm" x={-.62} selected={selected} onSelect={onSelect} wound anatomy={anatomy} />
+    <PatientArmZone label="Right arm" x={-.62} selected={selected} onSelect={onSelect} />
     <PatientLegZone label="Left leg" x={.24} selected={selected} onSelect={onSelect} />
     <PatientLegZone label="Right leg" x={-.24} selected={selected} onSelect={onSelect} />
   </group>;
@@ -273,9 +279,19 @@ function Leg({ side, x, selected, anatomy, onSelect }: { side:"Left"|"Right";x:n
   return <group position={[x,-.04,1.65]}><Region region={label} selected={selected} onSelect={onSelect}><mesh rotation={[Math.PI/2,0,0]}><capsuleGeometry args={[.24,1.7,8,16]} /><SkinMaterial selected={selected===label} anatomy={anatomy} /></mesh></Region></group>;
 }
 
-function WoundTrainingPatch({ anatomy }: { anatomy:boolean }) {
+function WoundTrainingPatch({ anatomy, position = [0, .14, .33] }: { anatomy:boolean; position?: [number, number, number] }) {
   const { state } = useSimulation();
-  return <group position={[0, .18, .33]}><WoundSurface embedded incisionProgress={state.incisionProgress} incisionComplete={state.incisionComplete} stitchPhase={state.stitchPhase} stitchProgress={state.stitchProgress} suturePosition={state.suturePosition} sutureAngle={state.sutureAngle} anatomy={anatomy} selectedTool={state.selectedTool} />{anatomy && <ForearmAnatomy />}</group>;
+  const anchor = useRef<THREE.Group>(null);
+  useEffect(() => () => { surgerySite.ready = false; }, []);
+  useFrame(() => {
+    if (!anchor.current) return;
+    anchor.current.updateWorldMatrix(true, false);
+    surgerySite.matrixWorld.copy(anchor.current.matrixWorld);
+    surgerySite.inverse.copy(anchor.current.matrixWorld).invert();
+    surgerySite.normal.set(0, 1, 0).transformDirection(anchor.current.matrixWorld);
+    surgerySite.ready = true;
+  });
+  return <group ref={anchor} position={position}><WoundSurface embedded incisionSegments={state.incisionSegments} incisionDepth={state.incisionDepth} incisionComplete={state.incisionComplete} stitchPhase={state.stitchPhase} stitchProgress={state.stitchProgress} suturePosition={state.suturePosition} anatomy={anatomy} />{anatomy && <ForearmAnatomy />}</group>;
 }
 
 function ForearmAnatomy(){return <group position={[0,.08,0]}><mesh position={[-.09,0,0]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[.025,.025,.6,12]}/><meshStandardMaterial color="#eee5c9"/></mesh><mesh position={[.09,0,0]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[.025,.025,.6,12]}/><meshStandardMaterial color="#eee5c9"/></mesh><Line points={[[-.14,.03,-.28],[-.12,.03,.28]]} color="#c6575d" lineWidth={2}/><Line points={[[.14,.03,-.28],[.11,.03,.28]]} color="#e1bc4f" lineWidth={1.5}/><Html position={[.28,.1,-.1]}><div className="anatomy-scene-labels"><span>Radius / ulna</span><span>Vessel path</span><span>Nerve path</span></div></Html></group>}
@@ -293,5 +309,5 @@ function IVStand(){return <group position={[-2.6,0,-1.65]}><mesh position={[0,1.
 function InstrumentTray({selectedTool, physical}:{selectedTool:string|null; physical?:boolean}){
   // when gesture tracking is live the tool is a rigid body owned by SurgicalPhysics, not tray dressing
   const asset = selectedTool && !physical ? TOOL_ASSETS[selectedTool] : undefined;
-  return <group position={[2.8,1.05,-.62]}><mesh><boxGeometry args={[1.35,.06,.76]}/><meshStandardMaterial color="#aab6b9" metalness={.75} roughness={.25}/></mesh>{[-.48,.48].map(x=><mesh key={x} position={[x,-.58,0]}><cylinderGeometry args={[.03,.04,1.15,10]}/><meshStandardMaterial color="#717e83" metalness={.5}/></mesh>)}{asset ? <SafeMedicalGLB path={asset.path} targetSize={.75} color="#bdc8cc" metalness={.84} roughness={.2} preserveTextures={false} position={[0,.13,0]} rotation={asset.rotation} fallback={<group />} /> : <><mesh position={[-.28,.07,0]} rotation={[0,.15,0]}><boxGeometry args={[.07,.04,.65]}/><meshStandardMaterial color="#c8d0d2" metalness={.8}/></mesh><mesh position={[.18,.07,.05]} rotation={[0,-.3,0]}><boxGeometry args={[.06,.04,.58]}/><meshStandardMaterial color="#c8d0d2" metalness={.8}/></mesh></>}{selectedTool&&<Html position={[0,.35,0]} center><span className="active-tray-label">{selectedTool} selected</span></Html>}</group>
+  return <group position={[2.8,1.05,-.62]}><mesh><boxGeometry args={[1.35,.06,.76]}/><meshStandardMaterial color="#aab6b9" metalness={.75} roughness={.25}/></mesh>{[-.48,.48].map(x=><mesh key={x} position={[x,-.58,0]}><cylinderGeometry args={[.03,.04,1.15,10]}/><meshStandardMaterial color="#717e83" metalness={.5}/></mesh>)}{!physical && (asset ? <SafeMedicalGLB path={asset.path} targetSize={.75} color="#bdc8cc" metalness={.84} roughness={.2} preserveTextures={false} position={[0,.13,0]} rotation={asset.rotation} fallback={<group />} /> : <><mesh position={[-.28,.07,0]} rotation={[0,.15,0]}><boxGeometry args={[.07,.04,.65]}/><meshStandardMaterial color="#c8d0d2" metalness={.8}/></mesh><mesh position={[.18,.07,.05]} rotation={[0,-.3,0]}><boxGeometry args={[.06,.04,.58]}/><meshStandardMaterial color="#c8d0d2" metalness={.8}/></mesh></>)}{selectedTool&&!physical&&<Html position={[0,.35,0]} center><span className="active-tray-label">{selectedTool} selected</span></Html>}</group>
 }

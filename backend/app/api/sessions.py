@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import CoachMessageRow, SimulationResult, SimulationSession, TrajectoryPoint
 from ..config import get_settings
-from ..schemas import (CoachMessageOut, HintResponse, SessionCreateRequest, SessionCreateResponse,
+from ..schemas import (CoachGenerateRequest, CoachGenerateResponse, CoachMessageOut, HintResponse, SessionCreateRequest, SessionCreateResponse,
                        SessionState, SimulationEventRequest, SimulationEventResponse,
                        SimulationResultOut, TrajectoryBatchRequest, TrajectoryResponse,
                        VisionMetricsRequest)
@@ -206,6 +206,22 @@ async def request_hint(session_id: str, db: Session = Depends(get_db)):
     await manager.broadcast(session_id, "coach.message",
                             {"type": "hint", "code": "HINT_USED", "message": hint})
     return {"message": hint, "related_step_id": step["id"], "penalty": penalty}
+
+
+@router.post("/coach/generate", response_model=CoachGenerateResponse)
+async def generate_coach_feedback(body: CoachGenerateRequest):
+    """Generates AI feedback and TTS audio based on a rule message and metrics."""
+    ai = coaching_engine.AsyncAIAssistant()
+    ai_message = await ai.generate_ai_feedback(body.message, body.metrics)
+    
+    audio_data = None
+    if ai_message:
+        audio_data = await ai.generate_tts_audio(ai_message)
+    else:
+        # Fallback to the original rule-based message if AI fails
+        audio_data = await ai.generate_tts_audio(body.message)
+        
+    return {"ai_message": ai_message, "audio_data": audio_data}
 
 
 # ---------- vision metrics ----------
