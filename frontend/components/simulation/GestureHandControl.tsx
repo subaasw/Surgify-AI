@@ -10,6 +10,7 @@ import { ModelErrorBoundary } from "./ModelRegistry";
 import { useSimulation } from "./SimulationProvider";
 import { MODEL_PATHS } from "@/data/modelConfig";
 import { procedureSteps } from "@/data/simulationData";
+import type { CameraMode } from "@/types/simulation";
 import { LandmarkFilter, WORKSPACE, classifyPose, damp, fingerDirs, palmPose, patientSurfaceYAt, rangeValueAt, relativeCursorAt, springStep, stablePinch } from "@/lib/handPhysics.mjs";
 import { MotionTracker, motionStats } from "@/lib/handMetrics.mjs";
 
@@ -36,14 +37,14 @@ export type HandWorldState = {
   /** World-space midpoint between thumb and index fingertips — where a pinched object sits. */
   pinchPoint: THREE.Vector3;
   velocity: THREE.Vector3;
-  /** How far the hand reaches into the field, 0 (pulled back) → 1 (deep over patient). Drives POV zoom. */
   reach: number;
+  holding: boolean;
 };
 
 const emptyHandWorld = (): HandWorldState => ({
   live: false, pinch: false, gesture: "",
   position: new THREE.Vector3(), quaternion: new THREE.Quaternion(),
-  pinchPoint: new THREE.Vector3(), velocity: new THREE.Vector3(), reach: 0,
+  pinchPoint: new THREE.Vector3(), velocity: new THREE.Vector3(), reach: 0, holding: false,
 });
 
 /** World-space pose of each rendered surgeon hand, written per frame by RiggedHand for the physics layer. */
@@ -62,20 +63,10 @@ const MODEL_PATH = "/mediapipe/gesture_recognizer.task";
 const STALE_MS = 400; // no detection for this long → hand fades out
 const PINCH_RATIO = .35; // thumb→index tip distance relative to hand size
 const HAND_LENGTH = .62; // wrist → middle fingertip, world units
-const CALIBRATION_FRAMES = 40; // ~1.3s of open palm before the hands go live
-// one-euro tuning: image coords are 0..1, world coords are meters — the same
-// knobs behave well for both since both spans are ~unit scale. Raise beta for
-// less motion lag, raise cutoff for less rest smoothing.
+const CALIBRATION_FRAMES = 40;
 const FILTER_CUTOFF = 1.2;
 const FILTER_BETA = 5;
 
-/**
- * Which surgeon hand a detection drives. Screen position is the ground truth:
- * the camera faces you, so the hand on the image's left half is your physical
- * right hand. With two hands present we sort by position, which is immune to
- * MediaPipe's (noisy, mirror-convention) handedness labels; with one hand we
- * fall back to the label, inverted because we feed raw un-mirrored frames.
- */
 function assignSides<T extends { handedness: string; landmarks: Landmark[] }>(hands: T[]): (T & { side: Side })[] {
   if (hands.length === 2) {
     const sorted = [...hands].sort((a, b) => a.landmarks[0].x - b.landmarks[0].x);
@@ -91,6 +82,19 @@ type TrackingPhase = "starting" | "denied" | "offline" | "calibrating" | "active
 type PinchState = { active: boolean; candidate: boolean; frames: number };
 
 const CONTROL_SELECTOR = 'button:not(:disabled),a[href],input[type="range"],[role="button"]:not([aria-disabled="true"])';
+
+// Radial command menu — each entry is a scene view, an instrument, or a toggle.
+type MenuItem = { label: string } & ({ view: CameraMode } | { tool: string } | { toggle: true });
+const HAND_MENU: MenuItem[] = [
+  { label: "Room", view: "room" },
+  { label: "Patient", view: "patient" },
+  { label: "Close-up", view: "closeup" },
+  { label: "Anatomy", toggle: true },
+  { label: "Needle holder", tool: "Needle holder" },
+  { label: "Forceps", tool: "Forceps" },
+  { label: "Scissors", tool: "Surgical scissors" },
+  { label: "Curved needle", tool: "Curved needle" },
+];
 
 function controlLabel(target: HTMLElement | null) {
   if (!target) return "";
@@ -111,16 +115,9 @@ function setRangeFromPointer(input: HTMLInputElement, clientX: number) {
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
-/**
- * DOM side of gesture control: runs MediaPipe gesture recognition directly in
- * the browser (GPU-accelerated, per video frame — no backend round trip),
- * one-euro-smooths every landmark, and publishes each detected hand into
- * `handStore`. Starts with a short open-palm calibration that measures the
- * hand at rest distance so depth (reach) maps to the user's own range.
- * Renders the picture-in-picture camera panel; keep it outside the r3f Canvas.
- */
+
 export function HandTrackingDriver() {
-  const { state } = useSimulation();
+  const { state, setCameraMode, selectTool, toggleAnatomy } = useSimulation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
@@ -129,6 +126,23 @@ export function HandTrackingDriver() {
   const [targetLabel, setTargetLabel] = useState("");
   const objective = procedureSteps[state.currentStep];
   const [motion, setMotion] = useState("");
+  // VR-style radial command wheel: double-pinch the left hand to open, aim the
+  // hand at a clockwise segment to highlight it, rest on it to commit.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuHighlight, setMenuHighlight] = useState(-1);
+  const menuOpenRef = useRef(false);
+  useEffect(() => { menuOpenRef.current = menuOpen; }, [menuOpen]);
+  // captured fresh each render so the tick loop commits with live actions
+  const commitRef = useRef<(i: number) => void>(() => {});
+  commitRef.current = (i: number) => {
+    const item = HAND_MENU[i];
+    if (!item) return;
+    if ("view" in item) setCameraMode(item.view);
+    else if ("tool" in item) selectTool(item.tool);
+    else toggleAnatomy();
+    setMenuOpen(false);
+    setMenuHighlight(-1);
+  };
 
   useEffect(() => {
     const cursorNode = cursorRef.current;
@@ -147,6 +161,15 @@ export function HandTrackingDriver() {
     let cursorAnchor = { x: 0, y: 0 };
     let publishedTarget = "";
     let lastMotionAt = 0;
+    const menuPinchWas: Record<Side, boolean> = { Left: false, Right: false };
+    const menuRise: Record<Side, number> = { Left: 0, Right: 0 }; // last pinch rise per hand
+    let menuHand: Side | null = null; // hand that opened the wheel — also aims it
+    let menuAnchor: { x: number; y: number } | null = null; // hand pos when opened
+    let menuAim = -1;        // currently highlighted segment
+    let menuDwell = 0;       // seconds the aim has rested on menuAim → commit
+    let menuIdle = 0;        // seconds aiming at nothing → auto-close
+    let menuAimedOnce = false;
+    let menuOpenAt = 0;
     const calSizes: number[] = [];
     const filters: Record<Side, { image: LandmarkFilter; world: LandmarkFilter }> = {
       Right: { image: new LandmarkFilter(FILTER_CUTOFF, FILTER_BETA), world: new LandmarkFilter(FILTER_CUTOFF, FILTER_BETA) },
@@ -202,7 +225,8 @@ export function HandTrackingDriver() {
       if (!cursor || !root) { clearHandControl(); return; }
 
       const bounds = root.getBoundingClientRect();
-      if (leftHand?.pinch) {
+      // a hand busy gripping a physics object doesn't also drive the UI cursor
+      if (leftHand?.pinch && !handWorld.Left.holding) {
         if (!moveActive) {
           moveActive = true;
           handAnchor = { ...leftHand.pointer };
@@ -211,7 +235,7 @@ export function HandTrackingDriver() {
         }
         cursorPosition = relativeCursorAt(leftHand.pointer, handAnchor, cursorAnchor, bounds);
       } else moveActive = false;
-      const transition = stablePinch(confirmPinch, Boolean(rightHand?.pinch));
+      const transition = stablePinch(confirmPinch, Boolean(rightHand?.pinch) && !handWorld.Right.holding);
       confirmPinch = transition.state;
       if (!cursorPosition) {
         cursor.hidden = true;
@@ -311,7 +335,44 @@ export function HandTrackingDriver() {
 
       handStore.hands = hands;
       handStore.at = now;
-      updateHandControl(hands);
+
+      for (const hand of hands) {
+        if (hand.pinch && !menuPinchWas[hand.side]) {
+          if (now - menuRise[hand.side] < 450) { // double-tap on this hand
+            if (menuOpenRef.current) { setMenuOpen(false); menuAnchor = null; menuHand = null; }
+            else {
+              menuHand = hand.side;
+              menuAnchor = { ...hand.pointer };
+              menuAim = -1; menuDwell = 0; menuIdle = 0; menuAimedOnce = false; menuOpenAt = now;
+              setMenuOpen(true); setMenuHighlight(-1);
+            }
+          }
+          menuRise[hand.side] = now;
+        }
+        menuPinchWas[hand.side] = hand.pinch;
+      }
+      for (const side of ["Left", "Right"] as const) if (!hands.some(hand => hand.side === side)) menuPinchWas[side] = false;
+
+      if (menuOpenRef.current) {
+        const aimHand = menuHand ? hands.find(hand => hand.side === menuHand) : undefined;
+        if (!aimHand || !menuAnchor || now - menuOpenAt > 6000) { // hand lost / hard timeout
+          setMenuOpen(false); menuAnchor = null; menuHand = null;
+        } else {
+          const dx = aimHand.pointer.x - menuAnchor.x, dy = aimHand.pointer.y - menuAnchor.y;
+          let idx = -1;
+          if (Math.hypot(dx, dy) > 0.055) { // outside the dead zone → aim at a segment
+            const rel = Math.atan2(dy, dx) + Math.PI / 2; // 0 at the top item, clockwise
+            const step = (Math.PI * 2) / HAND_MENU.length;
+            idx = ((Math.round(rel / step) % HAND_MENU.length) + HAND_MENU.length) % HAND_MENU.length;
+          }
+          if (idx !== menuAim) { menuAim = idx; menuDwell = 0; setMenuHighlight(idx); }
+          if (idx < 0) { if (menuAimedOnce) { menuIdle += dt; if (menuIdle > 1.2) { setMenuOpen(false); menuAnchor = null; } } }
+          else { menuAimedOnce = true; menuIdle = 0; menuDwell += dt; if (menuDwell > 0.55) { commitRef.current(idx); menuAnchor = null; menuAim = -1; } }
+        }
+        if (cursorRef.current) cursorRef.current.hidden = true;
+      } else {
+        updateHandControl(hands);
+      }
       if (now - lastMotionAt > 500) {
         lastMotionAt = now;
         const sides = (["Right", "Left"] as const).filter(side => motionStats[side].live);
@@ -386,12 +447,23 @@ export function HandTrackingDriver() {
         <div className="gesture-camera-live"><i /><span>{label}</span></div>
         <div className="gesture-camera-hud">
           <small>Stage {state.currentStep + 1} · {objective.title}</small>
-          <strong>{phase === "active" ? targetLabel ? `Right pinch · ${targetLabel}` : "Left pinch moves · Right pinch selects" : label}</strong>
+          <strong>{phase === "active" ? menuOpen ? "Aim your hand · rest on a mode to pick" : targetLabel ? `Right pinch · ${targetLabel}` : "Left pinch moves · Right pinch selects · double-pinch = wheel" : label}</strong>
           {active && <span>{gesture}</span>}
         </div>
       </div>
     </div>
     {phase === "active" && motion && <div className="gesture-pip-motion">{motion}</div>}
+    {phase === "active" && menuOpen && <div className="hand-menu">
+      <div className="hand-menu-hub"><small>Aim · rest to pick</small><strong>{menuHighlight >= 0 ? HAND_MENU[menuHighlight].label : "Select mode"}</strong></div>
+      {HAND_MENU.map((item, i) => {
+        const angle = (-90 + i * (360 / HAND_MENU.length)) * Math.PI / 180;
+        const r = 172;
+        const active = "view" in item ? state.cameraMode === item.view : "tool" in item ? state.selectedTool === item.tool : state.anatomyOverlay;
+        return <button key={item.label} className={`hand-menu-item${active ? " active" : ""}${i === menuHighlight ? " aim" : ""}`}
+          style={{ left: `calc(50% + ${(Math.cos(angle) * r).toFixed(1)}px)`, top: `calc(50% + ${(Math.sin(angle) * r).toFixed(1)}px)` }}
+          onClick={() => commitRef.current(i)}>{item.label}</button>;
+      })}
+    </div>}
     <div ref={cursorRef} className="gesture-screen-cursor" hidden aria-hidden="true"><i /><span>{targetLabel || "Left pinch to move"}</span></div>
   </>;
 }
@@ -431,14 +503,7 @@ export function GestureHand() {
   </>;
 }
 
-/**
- * One hand from hand.glb, skeleton driven joint-by-joint from MediaPipe:
- * palm orientation from the landmark basis, and every phalanx (thumb
- * included) aimed at its own landmark segment — individual finger bends,
- * spread, and thumb opposition all reproduce 1:1. Bone names in the asset are
- * generic, so fingers are identified from rest geometry: the thumb is the
- * 3-bone chain, and the rest order by distance from it.
- */
+
 function RiggedHand({ side }: { side: Side }) {
   const { scene } = useGLTF(MODEL_PATHS.hand);
   const { camera } = useThree();
@@ -579,6 +644,12 @@ function RiggedHand({ side }: { side: Side }) {
     tips.thumb.getWorldPosition(tipA);
     tips.index.getWorldPosition(tipB);
     tipA.add(tipB).multiplyScalar(.5);
+    // collision guard: rest the working fingertips ON the patient/table surface
+    // instead of sinking in — lift the whole hand by any penetration (stateless
+    // per frame, so no drift). Off to the side you can still reach the tray.
+    const overField = Math.abs(tipA.x) < 1.3 && Math.abs(tipA.z) < 2.6;
+    const surfaceY = overField ? WORKSPACE.floorY : 1.12;
+    if (tipA.y < surfaceY) { const lift = surfaceY - tipA.y; group.position.y += lift; tipA.y = surfaceY; }
     if (hw.live && delta > 0) {
       instantVel.copy(tipA).sub(hw.pinchPoint).divideScalar(delta);
       hw.velocity.lerp(instantVel, damp(18, delta));
