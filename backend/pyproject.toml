@@ -11,7 +11,7 @@ dependencies = [
     "sqlalchemy>=2.0",
     "python-multipart>=0.0.9",
     "numpy>=1.26",
-    "mediapipe>=0.10.21",
+    "opencv-python-headless>=4.9",  # was transitive via mediapipe; the aruco adapter still needs it
 ]
 
 [dependency-groups]

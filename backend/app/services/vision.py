@@ -5,7 +5,6 @@ low confidence + a warning instead.
 """
 import hashlib
 import math
-import threading
 import uuid
 from functools import lru_cache
 from pathlib import Path
@@ -111,102 +110,8 @@ class OpenCVAdapter:
         return result
 
 
-class MediaPipeAdapter:
-    """Google MediaPipe gestures, landmarks, pointer coordinates, and pinch state."""
-    mode = "mediapipe"
 
-    def __init__(self) -> None:
-        self._recognizer = None
-        self._lock = threading.Lock()
-
-    def _get_recognizer(self):
-        if self._recognizer is not None:
-            return self._recognizer
-
-        import mediapipe as mp
-
-        model_path = Path(settings.mediapipe_model_path)
-        if not model_path.is_absolute():
-            model_path = Path.cwd() / model_path
-        if not model_path.exists():
-            raise FileNotFoundError(f"MediaPipe model not found at {model_path}")
-
-        options = mp.tasks.vision.GestureRecognizerOptions(
-            base_options=mp.tasks.BaseOptions(model_asset_path=str(model_path)),
-            running_mode=mp.tasks.vision.RunningMode.IMAGE,
-            num_hands=2,
-            min_hand_detection_confidence=0.55,
-            min_hand_presence_confidence=0.55,
-            min_tracking_confidence=0.5,
-        )
-        self._recognizer = mp.tasks.vision.GestureRecognizer.create_from_options(options)
-        return self._recognizer
-
-    def process(self, data: bytes, session_id: str | None) -> dict:
-        result = {
-            "frame_id": _frame_id(), "session_id": session_id, "processed": True,
-            "mode": self.mode, "tracking_confidence": 0.0, "hands": [], "tools": [],
-            "metrics": {}, "warnings": [],
-        }
-        try:
-            import cv2
-            import mediapipe as mp
-            import numpy as np
-        except ImportError as exc:
-            result["warnings"].append(f"MediaPipe pipeline unavailable: {exc}")
-            return result
-
-        img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
-        if img is None:
-            result["warnings"].append("Frame could not be decoded as an image.")
-            return result
-
-        try:
-            rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-            with self._lock:
-                detection = self._get_recognizer().recognize(mp_image)
-        except Exception as exc:
-            result["warnings"].append(f"MediaPipe recognition failed: {exc}")
-            return result
-
-        confidences: list[float] = []
-        pinch_distances: list[float] = []
-        for index, landmarks in enumerate(detection.hand_landmarks):
-            handedness = detection.handedness[index][0] if index < len(detection.handedness) and detection.handedness[index] else None
-            gesture = detection.gestures[index][0] if index < len(detection.gestures) and detection.gestures[index] else None
-            thumb_tip, index_tip = landmarks[4], landmarks[8]
-            pinch_distance = math.hypot(thumb_tip.x - index_tip.x, thumb_tip.y - index_tip.y)
-            hand_score = float(handedness.score) if handedness else 0.75
-            gesture_score = float(gesture.score) if gesture else 0.0
-            confidences.append(max(hand_score, gesture_score))
-            pinch_distances.append(pinch_distance)
-            result["hands"].append({
-                "handedness": handedness.category_name if handedness else "Unknown",
-                "score": round(hand_score, 4),
-                "gesture": gesture.category_name if gesture else "None",
-                "gesture_score": round(gesture_score, 4),
-                "pinch": pinch_distance < 0.065,
-                "pinch_distance": round(pinch_distance, 4),
-                "pointer": {"x": round(index_tip.x, 5), "y": round(index_tip.y, 5)},
-                "landmarks": [
-                    {"x": round(point.x, 5), "y": round(point.y, 5), "z": round(point.z, 5)}
-                    for point in landmarks
-                ],
-            })
-
-        if result["hands"]:
-            result["tracking_confidence"] = round(max(confidences), 4)
-            result["metrics"] = {
-                "hand_count": len(result["hands"]),
-                "pinch_distance": round(min(pinch_distances), 4),
-            }
-        else:
-            result["warnings"].append("No hands detected in frame.")
-        return result
-
-
-_ADAPTERS = {"mock": MockAdapter, "opencv": OpenCVAdapter, "mediapipe": MediaPipeAdapter}
+_ADAPTERS = {"mock": MockAdapter, "opencv": OpenCVAdapter}
 
 
 @lru_cache(maxsize=3)

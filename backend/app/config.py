@@ -26,10 +26,8 @@ class Settings(BaseSettings):
     frontend_origins: str = ("http://localhost:3000,http://127.0.0.1:3000,"
                              "http://localhost:3001,http://127.0.0.1:3001")
 
-    vision_mode: str = "mediapipe"  # mock | opencv | mediapipe
-    enable_mediapipe: bool = True
+    vision_mode: str = "opencv"  # mock | opencv — hand tracking runs on-device in the frontend
     enable_opencv: bool = True
-    mediapipe_model_path: str = str(DATA_DIR / "models" / "gesture_recognizer.task")
     upload_dir: str = "./uploads"
     max_frame_size_mb: int = 5
 

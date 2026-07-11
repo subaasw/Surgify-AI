@@ -32,13 +32,13 @@ q = ok(c.post("/api/v1/patients/patient_forearm_01/questions", json={"question_i
 assert "allergies" in q["answer"]
 ok(c.post("/api/v1/patients/patient_forearm_01/questions", json={"question_id": "bogus"}), 404)
 
-# real MediaPipe pipeline initializes and safely handles a frame without a hand
+# real OpenCV pipeline initializes and safely handles a frame without a marker
 import cv2, numpy as np
 encoded, blank_frame = cv2.imencode(".jpg", np.zeros((256, 256, 3), dtype=np.uint8))
 assert encoded
-vision = ok(c.post("/api/v1/vision/frame", data={"mode": "mediapipe"},
+vision = ok(c.post("/api/v1/vision/frame", data={"mode": "opencv"},
                    files={"frame": ("frame.jpg", blank_frame.tobytes(), "image/jpeg")}))
-assert vision["processed"] and vision["mode"] == "mediapipe" and isinstance(vision["hands"], list)
+assert vision["processed"] and vision["mode"] == "opencv" and isinstance(vision["hands"], list)
 
 # session lifecycle
 created = ok(c.post("/api/v1/sessions", json={"scenario_id": "forearm-laceration", "mode": "virtual_patient"}), 201)

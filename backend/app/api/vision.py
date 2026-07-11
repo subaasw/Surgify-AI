@@ -26,11 +26,11 @@ async def process_frame(
         raise ApiError(413, "FRAME_TOO_LARGE", f"Frame exceeds {settings.max_frame_size_mb} MB limit.")
     if not data:
         raise ApiError(400, "EMPTY_FRAME", "The uploaded frame is empty.")
-    if mode and mode not in ("mock", "opencv", "mediapipe"):
+    if mode and mode not in ("mock", "opencv"):
         raise ApiError(400, "UNKNOWN_VISION_MODE", f"Unknown vision mode '{mode}'.")
     return await run_in_threadpool(get_adapter(mode).process, data, session_id)
 
 
 @router.get("/vision/modes")
 def vision_modes():
-    return {"default": settings.vision_mode, "available": ["mock", "opencv", "mediapipe"]}
+    return {"default": settings.vision_mode, "available": ["mock", "opencv"]}

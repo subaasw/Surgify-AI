@@ -11,6 +11,7 @@ import { useSimulation } from "./SimulationProvider";
 import { MODEL_PATHS } from "@/data/modelConfig";
 import { procedureSteps } from "@/data/simulationData";
 import { LandmarkFilter, WORKSPACE, classifyPose, damp, fingerDirs, palmPose, rangeValueAt, relativeCursorAt, springStep, stablePinch } from "@/lib/handPhysics.mjs";
+import { MotionTracker, motionStats } from "@/lib/handMetrics.mjs";
 
 type Landmark = { x: number; y: number; z: number };
 export type TrackedHand = {
@@ -23,8 +24,28 @@ export type TrackedHand = {
   side: Side;
 };
 
-type Side = "Left" | "Right";
+export type Side = "Left" | "Right";
 type Workspace = typeof WORKSPACE;
+
+export type HandWorldState = {
+  live: boolean;
+  pinch: boolean;
+  gesture: string;
+  position: THREE.Vector3;
+  quaternion: THREE.Quaternion;
+  /** World-space midpoint between thumb and index fingertips — where a pinched object sits. */
+  pinchPoint: THREE.Vector3;
+  velocity: THREE.Vector3;
+};
+
+const emptyHandWorld = (): HandWorldState => ({
+  live: false, pinch: false, gesture: "",
+  position: new THREE.Vector3(), quaternion: new THREE.Quaternion(),
+  pinchPoint: new THREE.Vector3(), velocity: new THREE.Vector3(),
+});
+
+/** World-space pose of each rendered surgeon hand, written per frame by RiggedHand for the physics layer. */
+export const handWorld: Record<Side, HandWorldState> = { Right: emptyHandWorld(), Left: emptyHandWorld() };
 
 /** Latest detections, written by the driver and read at render rate by useFrame. */
 export const handStore: {
@@ -105,6 +126,7 @@ export function HandTrackingDriver() {
   const [gesture, setGesture] = useState("No hands");
   const [targetLabel, setTargetLabel] = useState("");
   const objective = procedureSteps[state.currentStep];
+  const [motion, setMotion] = useState("");
 
   useEffect(() => {
     const cursorNode = cursorRef.current;
@@ -122,6 +144,7 @@ export function HandTrackingDriver() {
     let handAnchor = { x: 0, y: 0 };
     let cursorAnchor = { x: 0, y: 0 };
     let publishedTarget = "";
+    let lastMotionAt = 0;
     const calSizes: number[] = [];
     const filters: Record<Side, { image: LandmarkFilter; world: LandmarkFilter }> = {
       Right: { image: new LandmarkFilter(FILTER_CUTOFF, FILTER_BETA), world: new LandmarkFilter(FILTER_CUTOFF, FILTER_BETA) },
@@ -287,6 +310,14 @@ export function HandTrackingDriver() {
       handStore.hands = hands;
       handStore.at = now;
       updateHandControl(hands);
+      if (now - lastMotionAt > 500) {
+        lastMotionAt = now;
+        const sides = (["Right", "Left"] as const).filter(side => motionStats[side].live);
+        const travelled = motionStats.Right.distance + motionStats.Left.distance;
+        setMotion(sides.length
+          ? `path ${travelled.toFixed(2)}m · steady ${Math.round(Math.min(...sides.map(side => motionStats[side].steadiness)) * 100)}%`
+          : "");
+      }
       setGesture(hands.length
         ? hands.map(hand => `${hand.side[0]}·${hand.pinch ? "Pinch" : hand.gesture?.replace(/_/g, " ") || "Hand"}`).join("  ")
         : "No hands");
@@ -355,6 +386,7 @@ export function HandTrackingDriver() {
         </div>
       </div>
     </div>
+    {phase === "active" && motion && <div className="gesture-pip-motion">{motion}</div>}
     <div ref={cursorRef} className="gesture-screen-cursor" hidden aria-hidden="true"><i /><span>{targetLabel || "Left pinch to move"}</span></div>
   </>;
 }
@@ -383,6 +415,9 @@ const cameraWorld = new THREE.Vector3();
 const parentQuat = new THREE.Quaternion();
 const invQuat = new THREE.Quaternion();
 const targetQuat = new THREE.Quaternion();
+const tipA = new THREE.Vector3();
+const tipB = new THREE.Vector3();
+const instantVel = new THREE.Vector3();
 /** Both surgeon hands, each independently driven by its detected counterpart. */
 export function GestureHand() {
   return <>
@@ -411,7 +446,7 @@ function RiggedHand({ side }: { side: Side }) {
     z: { value: -3, velocity: 0 },
   });
 
-  const { rig, restQuatInv, restPalm, fingers } = useMemo(() => {
+  const { rig, restQuatInv, restPalm, fingers, tips } = useMemo(() => {
     // the GLB holds both hands; the right one rests on the +x side
     const sources = scene.children
       .filter(child => { let skinned = false; child.traverse(o => { if ((o as THREE.SkinnedMesh).isSkinnedMesh) skinned = true; }); return skinned; })
@@ -456,8 +491,12 @@ function RiggedHand({ side }: { side: Side }) {
       const joints = chainOf[name].slice(-3).map(bone => ({ bone, rest: bone.quaternion.clone() }));
       fingers[name] = { joints, parentRest: joints[0].bone.parent!.getWorldQuaternion(new THREE.Quaternion()) };
     }
-    return { rig, restQuatInv: basisQuat(across, up, forward).invert(), restPalm: { across, up, forward }, fingers };
+    // leaf bones sit at the fingertips — their midpoint is the pinch point
+    const tips = { thumb: chainOf.thumb[chainOf.thumb.length - 1], index: chainOf.index[chainOf.index.length - 1] };
+    return { rig, restQuatInv: basisQuat(across, up, forward).invert(), restPalm: { across, up, forward }, fingers, tips };
   }, [scene, side]);
+  const tracker = useMemo(() => new MotionTracker(), []);
+  useEffect(() => () => { handWorld[side].live = false; motionStats[side].live = false; }, [side]);
 
   useFrame((_, delta) => {
     const group = root.current;
@@ -466,7 +505,12 @@ function RiggedHand({ side }: { side: Side }) {
     const fresh = performance.now() - handStore.at < STALE_MS;
     const live = fresh ? handStore.hands.find(hand => hand.side === side) ?? null : null;
     group.visible = Boolean(live);
-    if (!live) { wasLive.current = false; return; }
+    if (!live) {
+      wasLive.current = false;
+      handWorld[side].live = false;
+      motionStats[side].live = false;
+      return;
+    }
     const pose = palmPose(live, handStore.workspace ?? WORKSPACE);
     const a = axes.current;
 
@@ -522,6 +566,31 @@ function RiggedHand({ side }: { side: Side }) {
         parentQuat.multiply(bone.quaternion);
       }
     }
+
+    // publish world-space pose for the physics layer + motion metrics HUD
+    const hw = handWorld[side];
+    tips.thumb.getWorldPosition(tipA);
+    tips.index.getWorldPosition(tipB);
+    tipA.add(tipB).multiplyScalar(.5);
+    if (hw.live && delta > 0) {
+      instantVel.copy(tipA).sub(hw.pinchPoint).divideScalar(delta);
+      hw.velocity.lerp(instantVel, damp(18, delta));
+    } else {
+      hw.velocity.set(0, 0, 0);
+      const travelled = tracker.distance; // smoothing state restarts, session path survives
+      tracker.reset();
+      tracker.distance = travelled;
+    }
+    hw.pinchPoint.copy(tipA);
+    hw.position.copy(group.position);
+    hw.quaternion.copy(rotGroup.quaternion);
+    hw.pinch = live.pinch;
+    hw.gesture = live.gesture;
+    hw.live = true;
+
+    const stats = tracker.update(a.x.value, a.y.value, a.z.value, delta);
+    Object.assign(motionStats[side], stats, { live: true });
+    motionStats.at = performance.now();
   });
 
   return <group ref={root} visible={false}>
