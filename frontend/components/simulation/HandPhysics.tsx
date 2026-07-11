@@ -51,12 +51,52 @@ const targetPosition = new THREE.Vector3();
 const targetRotation = new THREE.Quaternion();
 const gripOffset = new THREE.Vector3();
 const tipOffset = new THREE.Vector3();
-const bodyPosition = new THREE.Vector3();
 const localTip = new THREE.Vector3();
 const localNeedle = new THREE.Vector3();
 const localForceps = new THREE.Vector3();
 const toolAxis = new THREE.Vector3();
 const surfaceNormal = new THREE.Vector3();
+
+// How close a pinch must come to a tool's graspable length to pick it up.
+// Measured to the whole tip↔butt segment, so aiming anywhere along the visible
+// instrument grabs it — not just its center point (the old .34-to-center check
+// barely reached the blade, which is why capture felt unreliable).
+const GRAB_RADIUS = .24;
+const segButt = new THREE.Vector3();
+const segAB = new THREE.Vector3();
+const segProj = new THREE.Vector3();
+
+/** Shortest distance from point p to segment a→b. */
+function pointSegmentDistance(p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3) {
+  segAB.copy(b).sub(a);
+  const lenSq = segAB.lengthSq();
+  const t = lenSq > 1e-8 ? THREE.MathUtils.clamp(segProj.copy(p).sub(a).dot(segAB) / lenSq, 0, 1) : 0;
+  segProj.copy(a).addScaledVector(segAB, t);
+  return p.distanceTo(segProj);
+}
+
+/** Distance from a pinch point to a tool's full graspable length (tip ↔ butt, reflected through the body centre). */
+function graspDistance(pinch: THREE.Vector3, center: THREE.Vector3, tip: THREE.Vector3) {
+  segButt.copy(center).multiplyScalar(2).sub(tip);
+  return pointSegmentDistance(pinch, tip, segButt);
+}
+
+/**
+ * Nearest live, un-held instrument to a pinch point — the single source of truth
+ * for both grab and the in-zone highlight, so all four instruments agree instead
+ * of each racing to claim "I'm nearest" off stale positions.
+ */
+function nearestGraspTool(pinch: THREE.Vector3): { tool: PhysicalTool | null; distance: number } {
+  let tool: PhysicalTool | null = null;
+  let distance = Infinity;
+  for (const other of Object.keys(TOOL_CONFIG) as PhysicalTool[]) {
+    const world = toolWorld[other];
+    if (!world.live || world.holder) continue;
+    const d = graspDistance(pinch, world.position, world.tip);
+    if (d < distance) { distance = d; tool = other; }
+  }
+  return { tool, distance };
+}
 
 export function SurgicalPhysics({ active }: { active: boolean }) {
   if (!active) return null;
@@ -105,8 +145,8 @@ function PinchBody({ side }: { side: Side }) {
 function PhysicalInstrument({ tool }: { tool: PhysicalTool }) {
   const { state, grabTool, releaseHeldTool } = useSimulation();
   const body = useRef<RapierRigidBody>(null);
+  const halo = useRef<THREE.Mesh>(null);
   const holder = useRef<Side | null>(null);
-  const wasPinch = useRef<Record<Side, boolean>>({ Right: false, Left: false });
   const config = TOOL_CONFIG[tool];
   const gripRotation = useMemo(() => new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0)), []);
 
@@ -133,20 +173,24 @@ function PhysicalInstrument({ tool }: { tool: PhysicalTool }) {
     if (!rigid) return;
     const required = requiredSurgeryTools(state.currentStep, state.stitchPhase);
     if (holder.current && state.currentStep >= 5 && !required.includes(tool)) returnToTray(holder.current, rigid);
+    let inZone = false; // any live hand hovering this instrument's grab zone → highlight it
     for (const side of ["Right", "Left"] as const) {
       const hand = handWorld[side];
       const pinching = hand.live && hand.pinch;
-      const pinchStarted = pinching && !wasPinch.current[side];
-      wasPinch.current[side] = pinching;
-      if (!holder.current && pinchStarted && !hand.holding && !interactionState.menuOpen) {
-        bodyPosition.set(rigid.translation().x, rigid.translation().y, rigid.translation().z);
-        const distance = hand.pinchPoint.distanceTo(bodyPosition);
-        const nearest = (Object.keys(TOOL_CONFIG) as PhysicalTool[]).every(other => other === tool || !toolWorld[other].live || distance <= hand.pinchPoint.distanceTo(toolWorld[other].position) + .001);
-        if (distance <= .34 && nearest) {
-          holder.current = side;
-          hand.holding = true;
-          rigid.setBodyType(KINEMATIC_POSITION, true);
-          grabTool(side, tool);
+      // Grab is forgiving: hovering the zone highlights the nearest tool, and
+      // simply closing the hand there picks it up — no exact pinch-edge timing.
+      // `!hand.holding` keeps it to one tool per hand, so pinching near a second
+      // tool while already holding one can't steal it.
+      if (!holder.current && hand.live && !hand.holding && !interactionState.menuOpen) {
+        const near = nearestGraspTool(hand.pinchPoint);
+        if (near.tool === tool && near.distance <= GRAB_RADIUS) {
+          inZone = true;
+          if (pinching) {
+            holder.current = side;
+            hand.holding = true;
+            rigid.setBodyType(KINEMATIC_POSITION, true);
+            grabTool(side, tool);
+          }
         }
       }
       if (holder.current !== side) continue;
@@ -188,10 +232,15 @@ function PhysicalInstrument({ tool }: { tool: PhysicalTool }) {
     }
     runtime.holder = holder.current;
     runtime.live = true;
+    if (halo.current) halo.current.visible = inZone && !holder.current;
   });
 
   return <RigidBody ref={body} position={config.spawn} colliders={false} ccd linearDamping={1.2} angularDamping={1.6}>
     <CuboidCollider args={[.055, .045, .27]} friction={.85} restitution={0} />
+    <mesh ref={halo} visible={false} rotation={[Math.PI / 2, 0, 0]}>
+      <torusGeometry args={[.12, .011, 8, 28]} />
+      <meshBasicMaterial color="#63e08d" transparent opacity={.92} toneMapped={false} />
+    </mesh>
     {tool === "Scalpel" ? <ProceduralScalpel /> : <SafeMedicalGLB path={TOOL_ASSETS[tool].path} targetSize={config.size} color="#bdc8cc" metalness={.84} roughness={.2} preserveTextures={false} rotation={config.rotation} fallback={<group />} />}
   </RigidBody>;
 }
