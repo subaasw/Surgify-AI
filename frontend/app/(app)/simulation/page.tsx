@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, Check, Clock3, Crosshair, Hand, Layers3, MousePointer2, ScanLine, ShieldCheck, Sparkles, Stethoscope, Target } from "lucide-react";
+import { Activity, ArrowLeft, Check, Clock3, Crosshair, Hand, HeartPulse, Layers3, LockKeyhole, MousePointer2, ScanLine, ShieldCheck, ShieldPlus, Sparkles, Stethoscope, Target, UserRound } from "lucide-react";
 import { SimulationTopbar } from "@/components/simulation/SimulationTopbar";
 import { PatientPanel } from "@/components/simulation/PatientPanel";
 import { ProcedurePanel } from "@/components/simulation/ProcedurePanel";
 import { ToolBar } from "@/components/simulation/ToolBar";
 import { HospitalScene } from "@/components/simulation/HospitalScene";
+import { PatientReportUpload } from "@/components/simulation/PatientReportUpload";
 import { useSimulation } from "@/components/simulation/SimulationProvider";
 import { procedureSteps, stitchPhaseLabels } from "@/data/simulationData";
 import { INCISION_SEGMENTS } from "@/lib/handPhysics.mjs";
@@ -44,13 +45,26 @@ export default function SimulationPage() {
 }
 
 function SimulationBriefing() {
-  const { state, startSimulation, toggleTracking, setUiCollapsed } = useSimulation();
+  const { state, startSimulation, toggleTracking, setUiCollapsed, setPatientName } = useSimulation();
+  const [setupStep, setSetupStep] = useState<"role" | "case">("role");
   const begin = () => {
     if (!state.trackingOverlay) toggleTracking();
     setUiCollapsed(true);
     startSimulation();
   };
-  return <div className="briefing-overlay"><section className="briefing-card" role="dialog" aria-modal="true" aria-labelledby="briefing-title"><div className="briefing-kicker"><span><Stethoscope size={15} /></span>Case SG-2048 · Bed 04</div><h1 id="briefing-title">Forearm Nerve Repair</h1><p className="briefing-subtitle">Assessment, nerve exposure, approximation, and guided microsuture repair</p><div className="briefing-objective"><Target size={18} /><div><strong>Training objective</strong><p>Follow the clinical sequence, expose the divided nerve directly on the layered patient, align its ends, and complete a guided repair.</p></div></div><div className="briefing-facts"><span><Clock3 size={14} /><b>18 min</b> expected</span><span><ShieldCheck size={14} /><b>8 stages</b> guided</span><span><Sparkles size={14} /><b>Coach</b> enabled</span></div><fieldset className="input-choice"><legend>Required control mode</legend><button className="active" type="button"><Hand size={18} /><span><strong>Projected-hand control</strong><small>Pinch to grab; real hand and tool contact drive every surgical change</small></span><Check size={15} /></button></fieldset><button className="begin-simulation" onClick={begin}>Enable camera and begin</button><small className="briefing-disclaimer">Fictional layered patient · Educational simulation · No camera video is stored</small></section></div>;
+  if (setupStep === "role") return <RoleSelection onSelect={() => setSetupStep("case")} />;
+  return <div className="briefing-overlay"><section className="briefing-card" role="dialog" aria-modal="true" aria-labelledby="briefing-title"><button className="setup-back" onClick={()=>setSetupStep("role")}><ArrowLeft size={15}/>Change role</button><div className="briefing-kicker"><span><Stethoscope size={15} /></span>Case SG-2048 · Bed 04</div><h1 id="briefing-title">Forearm Nerve Repair</h1><p className="briefing-subtitle">Upload a patient report to personalize the case, or continue with the demo patient.</p><PatientReportUpload onNameExtracted={setPatientName} /><div className="briefing-objective"><Target size={18} /><div><strong>Training objective</strong><p>Follow the clinical sequence, expose the divided nerve directly on the layered patient, align its ends, and complete a guided repair.</p></div></div><div className="briefing-facts"><span><Clock3 size={14} /><b>18 min</b> expected</span><span><ShieldCheck size={14} /><b>8 stages</b> guided</span><span><Sparkles size={14} /><b>Coach</b> enabled</span></div><fieldset className="input-choice"><legend>Required control mode</legend><button className="active" type="button"><Hand size={18} /><span><strong>Projected-hand control</strong><small>Pinch to grab; real hand and tool contact drive every surgical change</small></span><Check size={15} /></button></fieldset><div className="case-start-actions"><button className="begin-simulation" onClick={begin}>Begin with {state.patientName}</button><button className="demo-case" onClick={()=>{setPatientName("Alex Morgan");begin();}}>Use demo patient</button></div><small className="briefing-disclaimer">Fictional layered patient · Educational simulation · No camera video is stored</small></section></div>;
+}
+
+const roles = [
+  { name: "Surgeon", detail: "Perform the operative workflow", image: "/images/roles/surgeon.png", icon: Stethoscope, available: true },
+  { name: "Anaesthesiologist", detail: "Manage anaesthesia and vital signs", image: "/images/roles/anaesthesiologist.png", icon: HeartPulse, available: false },
+  { name: "Theatre Nurse", detail: "Prepare the room and sterile field", image: "/images/roles/theatre-nurse.png", icon: ShieldPlus, available: false },
+  { name: "Surgical Assistant", detail: "Assist instruments and exposure", image: "/images/roles/surgical-assistant.png", icon: UserRound, available: false },
+];
+
+function RoleSelection({ onSelect }: { onSelect: () => void }) {
+  return <div className="briefing-overlay"><section className="role-selection-card" role="dialog" aria-modal="true" aria-labelledby="role-title"><div className="briefing-kicker"><span><UserRound size={15}/></span>Simulation role</div><h1 id="role-title">Choose your clinical role</h1><p>Select how you want to participate in this operating theatre scenario.</p><div className="role-grid">{roles.map(({name,detail,image,icon:Icon,available})=><button key={name} disabled={!available} onClick={onSelect} className={available?"available":"coming-soon"}><div className="role-image" style={{backgroundImage:`url("${image}")`}}><Icon size={28}/>{!available&&<span><LockKeyhole size={12}/>Coming soon</span>}</div><div><strong>{name}</strong><small>{detail}</small></div>{available&&<b>Available now</b>}</button>)}</div><small className="role-image-note">Role artwork loads from <code>public/images/roles</code>.</small></section></div>;
 }
 
 function IncisionInteraction() {

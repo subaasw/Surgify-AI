@@ -243,6 +243,10 @@ class CoachGenerateResponse(BaseModel):
     ai_message: str | None = None
     audio_data: str | None = None
 
+class PatientNameExtractionResponse(BaseModel):
+    extracted_name: str | None = None
+    raw_text: str
+    error: str | None = None
 
 # ---------- results ----------
 

@@ -8,6 +8,7 @@ import { INCISION_SEGMENTS } from "@/lib/handPhysics.mjs";
 
 const createInitialState = (): SimulationState => ({
   runStatus: "ready",
+  patientName: "Alex Morgan",
   selectedRegion: null,
   selectedTool: null,
   heldTools: { Left: null, Right: null },
@@ -59,6 +60,7 @@ type SimulationContextValue = {
   toggleAnatomy: () => void;
   toggleTracking: () => void;
   setUiCollapsed: (collapsed: boolean) => void;
+  setPatientName: (name: string) => void;
 };
 
 const SimulationContext = createContext<SimulationContextValue | null>(null);
@@ -333,12 +335,14 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     }),
     resetSimulation: () => setState(current => ({
       ...createInitialState(),
+      patientName: current.patientName,
       trackingOverlay: current.trackingOverlay,
       uiCollapsed: current.trackingOverlay,
     })),
     toggleAnatomy: () => setState(current => ({ ...current, anatomyOverlay: !current.anatomyOverlay, cameraMode: !current.anatomyOverlay ? "anatomy" : "patient" })),
     toggleTracking: () => setState(current => ({ ...current, trackingOverlay: !current.trackingOverlay })),
     setUiCollapsed: (collapsed) => setState(current => ({ ...current, uiCollapsed: collapsed })),
+    setPatientName: name => setState(current => ({ ...current, patientName: name.trim() || "Alex Morgan" })),
   }), [state, startSimulation, selectRegion, selectTool, releaseTool, grabTool, releaseHeldTool, recordCutSegment, performAction]);
 
   return <SimulationContext.Provider value={value}>{children}</SimulationContext.Provider>;

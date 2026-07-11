@@ -15,6 +15,8 @@ test("server-renders the immersive simulation shell", async () => {
   assert.match(html, /Forearm Nerve Repair/);
   assert.match(html, /Alex Morgan/);
   assert.match(html, /AI Coach/);
+  assert.match(html, /Choose your clinical role/);
+  assert.match(html, /Surgeon/);
   assert.doesNotMatch(html, /No headset required|How it works|Launch Prototype/);
   assert.doesNotMatch(html, /Trace the incision path|Begin controlled incision|Confirm incision/);
 });

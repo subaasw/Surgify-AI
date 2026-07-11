@@ -28,6 +28,7 @@ export type SimulationRunStatus = "ready" | "active" | "complete";
 
 export type SimulationState = {
   runStatus: SimulationRunStatus;
+  patientName: string;
   selectedRegion: string | null;
   selectedTool: string | null;
   heldTools: Record<"Left" | "Right", string | null>;
