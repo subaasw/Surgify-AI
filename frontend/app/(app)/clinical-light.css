@@ -2,12 +2,13 @@
 
 /* Launcher, results and settings. */
 .simulation-app :is(.scenario-app-search,.app-page-header-actions>button,.launcher-toolbar>div:last-child,.launcher-tile,.launcher-note,.scenario-result-summary,.scenario-metric,.action-review,.result-timeline,.coach-summary,.result-footer-actions button,.result-time-chip,.settings-app-panel,.shortcut-list kbd,.instrument-app-chip){background:#fff;color:var(--text);border-color:var(--border);box-shadow:0 8px 24px rgba(31,78,113,.06)}
+.simulation-app .scenario-launcher{--copy:var(--text);--soft:var(--muted);--kicker:var(--muted);--chip-color:#39769f;--chip-bg:#edf5fb}
 .simulation-app .scenario-app-search input{color:var(--text)}
 .simulation-app .launcher-toolbar button.active{background:#e4f2fb;color:var(--cyan)}
 .simulation-app .tile-status{background:rgba(255,255,255,.9);color:var(--text)}
 .simulation-app :is(.launcher-skills small,.sim-preferences>div>span){background:#edf5fb;color:#39769f;border-color:var(--border)}
 .simulation-app .launcher-progress>i,.simulation-app .scenario-metric>i{background:#dce8f1}
-.simulation-app .launch-scenario{background:#e4f2fb;color:var(--cyan);border-color:rgba(20,120,201,.25)}
+.simulation-app .launch-scenario{background:linear-gradient(135deg,var(--cyan),var(--blue));color:#fff;border-color:transparent}
 .simulation-app .result-score-dial{background:conic-gradient(var(--cyan) var(--score),#d9e6ef 0)}
 .simulation-app .result-score-dial::before{background:#fff}
 .simulation-app .sim-switch{background:#d8e5ee;border-color:#b7cad8}

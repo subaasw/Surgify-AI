@@ -37,6 +37,8 @@ class Settings(BaseSettings):
 
     enable_external_llm: bool = False
     anthropic_api_key: str = ""
+    ollama_host: str = "http://localhost:11434"
+    ollama_model: str = "medgemma1.5:latest"
 
     demo_mode: bool = True
     vitals_interval_seconds: float = 4.0

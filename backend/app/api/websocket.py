@@ -11,6 +11,7 @@ from ..models import SimulationSession
 from ..services import simulation_engine, vitals
 from ..services.data_store import store
 from ..services.websocket_manager import manager
+from ..services.coaching_engine import ai_assistant
 from .sessions import session_state_json
 
 router = APIRouter()
@@ -38,6 +39,23 @@ async def _vitals_loop(session_id: str) -> None:
 def _envelope(ws_type: str, session_id: str, payload: dict) -> dict:
     return {"type": ws_type, "session_id": session_id,
             "timestamp": datetime.now(timezone.utc).isoformat(), "payload": payload}
+
+
+async def generate_and_send_ai_coach_message(session_id: str, feedback_item: dict, metrics: dict):
+    """Background task to generate AI message and TTS, then broadcast."""
+    rule_msg = feedback_item.get("message", "")
+    if not rule_msg:
+        return
+        
+    ai_msg = await ai_assistant.generate_ai_feedback(metrics, rule_message)
+    audio_data = await ai_assistant.generate_tts_audio(ai_msg)
+    
+    # Update the feedback item with AI enhancements
+    enhanced_fb = dict(feedback_item)
+    enhanced_fb["ai_message"] = ai_msg
+    enhanced_fb["audio_data"] = audio_data
+    
+    await manager.broadcast(session_id, "coach.ai_message", enhanced_fb)
 
 
 @router.websocket("/ws/sessions/{session_id}")
@@ -73,6 +91,11 @@ async def session_channel(websocket: WebSocket, session_id: str):
                         await manager.broadcast(session_id, "session.updated", session_state_json(session))
                         for fb in response["feedback"]:
                             await manager.broadcast(session_id, "coach.message", fb)
+                            asyncio.create_task(
+                                generate_and_send_ai_coach_message(
+                                    session_id, fb, session.metrics.model_dump() if session.metrics else {}
+                                )
+                            )
                         if response["step_completed"]:
                             await manager.broadcast(session_id, "step.completed", {
                                 "completed_step_id": response["completed_step_id"],

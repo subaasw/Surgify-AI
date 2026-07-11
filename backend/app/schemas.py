@@ -191,6 +191,8 @@ class FeedbackItem(BaseModel):
     type: str
     code: str
     message: str
+    audio_data: str | None = None
+    ai_message: str | None = None
 
 
 class NextStepOut(BaseModel):
@@ -222,6 +224,8 @@ class CoachMessageOut(BaseModel):
     timestamp: datetime
     related_step_id: str | None = None
     suggested_action: str | None = None
+    audio_data: str | None = None
+    ai_message: str | None = None
 
 
 class HintResponse(BaseModel):
