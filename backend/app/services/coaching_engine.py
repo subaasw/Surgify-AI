@@ -82,16 +82,43 @@ def build_summary(metrics: dict, critical_errors: list[str], missed: list[str]) 
 
 
 import base64
+import time
 import ollama
 import edge_tts
 from ..config import get_settings
 
 settings = get_settings()
 
+# Probe Ollama once and cache the result: if it isn't installed/running or the
+# configured model isn't pulled, AI coaching and voice are disabled together —
+# no per-request retries. Re-probes every 30s so it recovers if Ollama comes up.
+_ollama_ready: bool | None = None
+_ollama_checked_at = 0.0
+
+async def ollama_available() -> bool:
+    global _ollama_ready, _ollama_checked_at
+    if _ollama_ready is not None and (time.monotonic() - _ollama_checked_at) < 30:
+        return _ollama_ready
+    _ollama_checked_at = time.monotonic()
+    try:
+        listed = await ollama.AsyncClient(host=settings.ollama_host).list()
+        models = getattr(listed, "models", None) or listed.get("models", [])
+        names = [getattr(m, "model", None) or (m.get("model") or m.get("name")) for m in models]
+        want = settings.ollama_model
+        _ollama_ready = any(n == want or (n or "").startswith(want.split(":")[0]) for n in names)
+        if not _ollama_ready:
+            print(f"Ollama model '{want}' not found — AI coaching + voice disabled. Available: {names}")
+    except Exception as e:
+        print(f"Ollama unavailable — AI coaching + voice disabled: {e}")
+        _ollama_ready = False
+    return _ollama_ready
+
 class AsyncAIAssistant:
     """Uses Ollama and edge-tts to generate AI coaching messages asynchronously."""
 
-    async def generate_ai_feedback(self, metrics: dict, rule_message: str) -> str:
+    async def generate_ai_feedback(self, metrics: dict, rule_message: str) -> str | None:
+        if not await ollama_available():
+            return None
         prompt = (
             f"You are an expert surgical coach. A trainee just triggered this feedback: '{rule_message}'. "
             f"Their current metrics are: {metrics}. "
@@ -113,8 +140,10 @@ class AsyncAIAssistant:
                 
             return raw_text.strip()
         except Exception as e:
+            # Model not found / Ollama unavailable: signal failure so the caller
+            # falls back to the plain rule message and skips voice generation.
             print(f"Ollama generation failed: {e}")
-            return rule_message
+            return None
 
     async def generate_tts_audio(self, text: str) -> str | None:
         try:

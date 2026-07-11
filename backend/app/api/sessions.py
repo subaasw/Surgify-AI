@@ -212,16 +212,14 @@ async def request_hint(session_id: str, db: Session = Depends(get_db)):
 async def generate_coach_feedback(body: CoachGenerateRequest):
     """Generates AI feedback and TTS audio based on a rule message and metrics."""
     ai = coaching_engine.AsyncAIAssistant()
-    ai_message = await ai.generate_ai_feedback(body.message, body.metrics)
-    
-    audio_data = None
+    ai_message = await ai.generate_ai_feedback(body.metrics, body.message)
+
     if ai_message:
         audio_data = await ai.generate_tts_audio(ai_message)
-    else:
-        # Fallback to the original rule-based message if AI fails
-        audio_data = await ai.generate_tts_audio(body.message)
-        
-    return {"ai_message": ai_message, "audio_data": audio_data}
+        return {"ai_message": ai_message, "audio_data": audio_data}
+
+    # Ollama model not found / unavailable: show the rule message, no voice.
+    return {"ai_message": body.message, "audio_data": None}
 
 
 # ---------- vision metrics ----------

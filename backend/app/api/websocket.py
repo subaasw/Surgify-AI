@@ -47,14 +47,17 @@ async def generate_and_send_ai_coach_message(session_id: str, feedback_item: dic
     if not rule_msg:
         return
         
-    ai_msg = await ai_assistant.generate_ai_feedback(metrics, rule_message)
+    ai_msg = await ai_assistant.generate_ai_feedback(metrics, rule_msg)
+    if not ai_msg:
+        return  # Ollama/model not set up — skip AI coach message and voice entirely
+
     audio_data = await ai_assistant.generate_tts_audio(ai_msg)
-    
+
     # Update the feedback item with AI enhancements
     enhanced_fb = dict(feedback_item)
     enhanced_fb["ai_message"] = ai_msg
     enhanced_fb["audio_data"] = audio_data
-    
+
     await manager.broadcast(session_id, "coach.ai_message", enhanced_fb)
 
 
