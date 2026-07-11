@@ -199,8 +199,6 @@ const TOOL_ASSETS: Record<string, string> = {
 const basisQuat = (across: THREE.Vector3, forward: THREE.Vector3, up: THREE.Vector3) =>
   new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(across, forward, up));
 
-const scratchQuat = new THREE.Quaternion(); // reused every frame by the curl loop
-
 /** Both surgeon hands, each independently driven by its detected counterpart. */
 export function GestureHand() {
   return <>

@@ -19,6 +19,9 @@ export const modelConfig = {
     lungs: { source: "/3d/Organs/Lungs.glb", color: "#e58f9b" },
     ribCage: { source: "/3d/Organs/Rib Cage.glb", color: "#e9e1ca" },
     heart: { source: "/3d/Organs/heart.glb", color: "#c94755" },
+    muscle: { source: "/3d/Organs/muscle.glb", color: "#b64953" },
+    liver: { source: "/3d/Organs/liver.glb", color: "#7f352f" },
+    stomach: { source: "/3d/Organs/stomach.glb", color: "#c48674" },
   },
 } as const;
 
@@ -37,4 +40,7 @@ export const MODEL_PATHS = {
   lungs: "/3d/Organs/Lungs.glb",
   ribCage: "/3d/Organs/Rib Cage.glb",
   heart: "/3d/Organs/heart.glb",
+  muscle: "/3d/Organs/muscle.glb",
+  liver: "/3d/Organs/liver.glb",
+  stomach: "/3d/Organs/stomach.glb",
 } as const;
