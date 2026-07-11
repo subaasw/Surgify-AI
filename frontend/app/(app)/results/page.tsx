@@ -3,7 +3,7 @@
 import { Activity, AlertTriangle, ArrowLeft, Check, CheckCircle2, Clock3, Crosshair, MousePointer2, RotateCcw, ShieldCheck, Sparkles, Target, TrendingUp, UserCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSimulation } from "@/components/simulation/SimulationProvider";
 import { procedureSteps } from "@/data/simulationData";
 import type { SimulationEvent } from "@/types/simulation";
@@ -15,7 +15,11 @@ type SavedResult = { score:number;elapsedTime:number;completedSteps:string[];com
 export default function ResultsPage() {
   const { state, resetSimulation } = useSimulation();
   const router = useRouter();
-  const [saved] = useState<SavedResult|null>(() => { if(typeof window === "undefined") return null; try { return JSON.parse(localStorage.getItem("surgify:simulation-result") ?? "null"); } catch { return null; } });
+  // Read localStorage in an effect, not in the initializer: reading it during the
+  // first render makes the client disagree with the (window-less) server HTML and
+  // trips a hydration mismatch. Start null to match SSR, then hydrate post-mount.
+  const [saved, setSaved] = useState<SavedResult|null>(null);
+  useEffect(() => { try { setSaved(JSON.parse(localStorage.getItem("surgify:simulation-result") ?? "null")); } catch { /* ignore corrupt cache */ } }, []);
   const result: SavedResult|null = state.runStatus === "complete" ? state : saved;
   if (!result) return <div className="app-page results-app-page"><header className="app-page-header"><div><h1>Performance review</h1><p>Complete a scenario to generate a debrief.</p></div></header><div className="app-page-content result-content"><section className="no-result-state"><span><Target size={24}/></span><h2>No completed simulation yet</h2><p>Your sequence, accuracy, safety checks, and coach timeline will appear here after a completed run.</p><Link href="/scenarios" className="button button-primary button-md"><ArrowLeft size={14}/>Choose a scenario</Link></section></div></div>;
 
