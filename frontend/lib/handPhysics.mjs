@@ -51,6 +51,20 @@ export function patientSurfaceYAt(x, z) {
 }
 
 /**
+ * Solid-surface height under a hand anywhere in the room, so fingertips rest on
+ * whatever is below them instead of sinking in: the contoured patient body, the
+ * operating bed, the instrument tray, else the floor. One source of truth for
+ * both the wrist and the fingertip collision clamps.
+ */
+export function sceneSurfaceYAt(x, z) {
+  const body = patientSurfaceYAt(x, z);
+  if (body != null) return body;                                    // on the patient
+  if (Math.abs(x) <= 1.18 && Math.abs(z) <= 2.42) return 1.73;      // operating bed top
+  if (x >= 2.1 && x <= 3.5 && z >= -1.02 && z <= -.22) return 1.08; // instrument tray top
+  return 1.0;                                                        // room floor
+}
+
+/**
  * Two-frame pinch debounce. Returns a new tiny state object and emits only on
  * stable edges, so holding a pinch cannot repeatedly activate a control.
  */

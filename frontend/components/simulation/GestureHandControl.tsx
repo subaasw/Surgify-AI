@@ -11,7 +11,7 @@ import { useSimulation } from "./SimulationProvider";
 import { MODEL_PATHS } from "@/data/modelConfig";
 import { procedureSteps } from "@/data/simulationData";
 import type { CameraMode } from "@/types/simulation";
-import { LandmarkFilter, WORKSPACE, classifyPose, damp, fingerDirs, palmPose, patientSurfaceYAt, rangeValueAt, relativeCursorAt, springStep, stablePinch } from "@/lib/handPhysics.mjs";
+import { LandmarkFilter, WORKSPACE, classifyPose, damp, fingerDirs, palmPose, rangeValueAt, relativeCursorAt, sceneSurfaceYAt, springStep, stablePinch } from "@/lib/handPhysics.mjs";
 import { MotionTracker, motionStats } from "@/lib/handMetrics.mjs";
 
 type Landmark = { x: number; y: number; z: number };
@@ -83,18 +83,22 @@ type PinchState = { active: boolean; candidate: boolean; frames: number };
 
 const CONTROL_SELECTOR = 'button:not(:disabled),a[href],input[type="range"],[role="button"]:not([aria-disabled="true"])';
 
-// Radial command menu — each entry is a scene view, an instrument, or a toggle.
+// Radial command menu — each entry is a scene view (incl. zoom), an instrument, or a toggle.
 type MenuItem = { label: string } & ({ view: CameraMode } | { tool: string } | { toggle: true });
 const HAND_MENU: MenuItem[] = [
-  { label: "Room", view: "room" },
+  { label: "Zoom in", view: "closeup" },
+  { label: "Zoom out", view: "room" },
   { label: "Patient", view: "patient" },
-  { label: "Close-up", view: "closeup" },
   { label: "Anatomy", toggle: true },
   { label: "Needle holder", tool: "Needle holder" },
   { label: "Forceps", tool: "Forceps" },
   { label: "Scissors", tool: "Surgical scissors" },
   { label: "Curved needle", tool: "Curved needle" },
 ];
+
+// Shared UI-interaction state the physics layer reads: while the wheel is open,
+// a pinch selects a menu item, so grabbing is suppressed to avoid double meaning.
+export const interactionState = { menuOpen: false };
 
 function controlLabel(target: HTMLElement | null) {
   if (!target) return "";
@@ -131,7 +135,7 @@ export function HandTrackingDriver() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuHighlight, setMenuHighlight] = useState(-1);
   const menuOpenRef = useRef(false);
-  useEffect(() => { menuOpenRef.current = menuOpen; }, [menuOpen]);
+  useEffect(() => { menuOpenRef.current = menuOpen; interactionState.menuOpen = menuOpen; }, [menuOpen]);
   // captured fresh each render so the tick loop commits with live actions
   const commitRef = useRef<(i: number) => void>(() => {});
   commitRef.current = (i: number) => {
@@ -169,6 +173,7 @@ export function HandTrackingDriver() {
     let menuDwell = 0;       // seconds the aim has rested on menuAim → commit
     let menuIdle = 0;        // seconds aiming at nothing → auto-close
     let menuAimedOnce = false;
+    let menuAimPinchWas = false; // pinch rising-edge while aiming → instant select
     let menuOpenAt = 0;
     const calSizes: number[] = [];
     const filters: Record<Side, { image: LandmarkFilter; world: LandmarkFilter }> = {
@@ -366,8 +371,12 @@ export function HandTrackingDriver() {
             idx = ((Math.round(rel / step) % HAND_MENU.length) + HAND_MENU.length) % HAND_MENU.length;
           }
           if (idx !== menuAim) { menuAim = idx; menuDwell = 0; setMenuHighlight(idx); }
+          // pinch on the highlighted segment picks it instantly; resting also commits
+          const aimPinch = aimHand.pinch;
+          const pinchPicked = aimPinch && !menuAimPinchWas && idx >= 0;
+          menuAimPinchWas = aimPinch;
           if (idx < 0) { if (menuAimedOnce) { menuIdle += dt; if (menuIdle > 1.2) { setMenuOpen(false); menuAnchor = null; } } }
-          else { menuAimedOnce = true; menuIdle = 0; menuDwell += dt; if (menuDwell > 0.55) { commitRef.current(idx); menuAnchor = null; menuAim = -1; } }
+          else { menuAimedOnce = true; menuIdle = 0; menuDwell += dt; if (pinchPicked || menuDwell > 0.55) { commitRef.current(idx); menuAnchor = null; menuAim = -1; } }
         }
         if (cursorRef.current) cursorRef.current.hidden = true;
       } else {
@@ -447,7 +456,7 @@ export function HandTrackingDriver() {
         <div className="gesture-camera-live"><i /><span>{label}</span></div>
         <div className="gesture-camera-hud">
           <small>Stage {state.currentStep + 1} · {objective.title}</small>
-          <strong>{phase === "active" ? menuOpen ? "Aim your hand · rest on a mode to pick" : targetLabel ? `Right pinch · ${targetLabel}` : "Left pinch moves · Right pinch selects · double-pinch = wheel" : label}</strong>
+          <strong>{phase === "active" ? menuOpen ? "Aim a mode · pinch or rest to pick" : targetLabel ? `Right pinch · ${targetLabel}` : "Left pinch moves · Right pinch selects · double-pinch = wheel" : label}</strong>
           {active && <span>{gesture}</span>}
         </div>
       </div>
@@ -611,8 +620,11 @@ function RiggedHand({ side }: { side: Side }) {
     springStep(a.z, targetZ, delta, 170, 26);
     cameraLocal.set(a.x.value, a.y.value, a.z.value);
     cameraWorld.copy(cameraLocal).applyQuaternion(camera.quaternion).add(camera.position);
-    const patientSurface = patientSurfaceYAt(cameraWorld.x, cameraWorld.z);
-    cameraWorld.y = Math.max(cameraWorld.y, (patientSurface ?? 1.15) + .14);
+    // keep the hand inside the operating room — never let it drift into walls/void
+    cameraWorld.x = THREE.MathUtils.clamp(cameraWorld.x, -3.3, 3.3);
+    cameraWorld.z = THREE.MathUtils.clamp(cameraWorld.z, -3.7, 3.7);
+    cameraWorld.y = Math.min(cameraWorld.y, 4.2);
+    cameraWorld.y = Math.max(cameraWorld.y, sceneSurfaceYAt(cameraWorld.x, cameraWorld.z) + .05);
     group.position.copy(cameraWorld);
     rotGroup.quaternion.slerp(worldQuat, damp(20, delta));
 
@@ -644,12 +656,11 @@ function RiggedHand({ side }: { side: Side }) {
     tips.thumb.getWorldPosition(tipA);
     tips.index.getWorldPosition(tipB);
     tipA.add(tipB).multiplyScalar(.5);
-    // collision guard: rest the working fingertips ON the patient/table surface
-    // instead of sinking in — lift the whole hand by any penetration (stateless
-    // per frame, so no drift). Off to the side you can still reach the tray.
-    const overField = Math.abs(tipA.x) < 1.3 && Math.abs(tipA.z) < 2.6;
-    const surfaceY = overField ? WORKSPACE.floorY : 1.12;
-    if (tipA.y < surfaceY) { const lift = surfaceY - tipA.y; group.position.y += lift; tipA.y = surfaceY; }
+    // collision guard: rest the working fingertips ON whatever solid surface is
+    // under them (body / bed / tray / floor) instead of sinking in — lift the
+    // whole hand by any penetration (stateless per frame, so no drift).
+    const surfaceY = sceneSurfaceYAt(tipA.x, tipA.z);
+    if (tipA.y < surfaceY) { group.position.y += surfaceY - tipA.y; tipA.y = surfaceY; }
     if (hw.live && delta > 0) {
       instantVel.copy(tipA).sub(hw.pinchPoint).divideScalar(delta);
       hw.velocity.lerp(instantVel, damp(18, delta));
