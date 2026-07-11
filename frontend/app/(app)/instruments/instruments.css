@@ -1,1 +1,128 @@
-.instrument-app-chip{height:27px;display:flex;align-items:center;gap:5px;padding:0 8px;border:1px solid var(--border);background:#102131;border-radius:5px;color:#73899b;font-size:.42rem}.instrument-app-page .app-page-content{height:calc(100vh - 58px);overflow:hidden}.instrument-app-page .instrument-section{margin:0;height:100%}.instrument-app-page .instrument-head{height:70px;margin:0;padding:3px 4px 10px}.instrument-app-page .instrument-head h2{font-size:1.05rem}.instrument-app-page .instrument-head>div>p:last-child{font-size:.53rem}.instrument-app-page .instrument-layout{height:calc(100% - 70px);min-height:0;grid-template-columns:205px minmax(430px,1fr) 245px;gap:8px}.instrument-app-page .instrument-stage{height:100%}.instrument-app-page .instrument-list{overflow:auto}.instrument-app-page .instrument-info{overflow:auto}@media(max-width:1050px){.instrument-app-page .app-page-content{overflow:auto}.instrument-app-page .instrument-layout{height:auto;grid-template-columns:190px 1fr}.instrument-app-page .instrument-stage{height:600px}}@media(max-width:750px){.instrument-app-page .instrument-layout{grid-template-columns:1fr}.instrument-app-page .instrument-list{display:grid;grid-template-columns:1fr 1fr}.instrument-app-chip{display:none}}
+.instrument-app-page{
+  --lab-glass:linear-gradient(145deg,rgba(10,29,46,.78),rgba(20,50,73,.54));
+  --lab-glass-soft:linear-gradient(145deg,rgba(15,39,59,.7),rgba(13,33,51,.48));
+  --lab-line:rgba(225,243,255,.27);
+  --lab-text:#f3f9fc;
+  --lab-muted:#b9ccda;
+  position:fixed;
+  inset:0;
+  z-index:100;
+  overflow:hidden;
+  color:var(--lab-text);
+  background:#0a1b2a;
+}
+
+.instrument-app-page::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:2;
+  pointer-events:none;
+  background:radial-gradient(circle at 50% 44%,transparent 22%,rgba(4,14,23,.15) 65%,rgba(2,9,16,.52) 100%);
+}
+
+.instrument-app-page .app-page-header{
+  position:absolute;
+  z-index:30;
+  top:18px;
+  left:18px;
+  right:18px;
+  height:70px;
+  padding:0 14px;
+  color:var(--lab-text);
+  border:1px solid var(--lab-line);
+  border-radius:20px;
+  background:var(--lab-glass);
+  box-shadow:inset 0 1px rgba(255,255,255,.15),0 18px 42px rgba(3,12,21,.26);
+  backdrop-filter:blur(24px) saturate(140%);
+  -webkit-backdrop-filter:blur(24px) saturate(140%);
+}
+
+.instrument-app-title,.instrument-app-title>div,.instrument-app-page .app-page-header-actions,.instrument-app-chip,.instrument-return{
+  display:flex;
+  align-items:center;
+}
+
+.instrument-app-title{gap:13px;min-width:0}.instrument-app-title>.brand{color:white}.instrument-app-title>.brand .brand-name{font-size:1rem}.instrument-app-title>i{width:1px;height:32px;background:var(--lab-line)}
+.instrument-app-title>div{display:block;min-width:0}.instrument-app-title span{display:block;color:#79c7ff;font-size:.62rem;font-weight:750;letter-spacing:.1em;text-transform:uppercase}
+.instrument-app-title h1{margin:2px 0 0!important;color:var(--lab-text);font-size:1.08rem!important}.instrument-app-title p{margin:2px 0 0!important;color:var(--lab-muted)!important;font-size:.66rem!important}
+.instrument-app-page .app-page-header-actions{gap:8px}
+.instrument-app-chip,.instrument-return{height:36px;gap:7px;padding:0 11px;border:1px solid rgba(225,243,255,.18);border-radius:11px;background:rgba(229,244,255,.08);color:var(--lab-muted);font-size:.67rem;white-space:nowrap}
+.instrument-return{color:#e9f6ff;transition:.18s}.instrument-return:hover,.instrument-return:focus-visible{background:rgba(72,157,230,.2);border-color:rgba(120,196,255,.4);outline:none}
+
+.instrument-app-page .app-page-content{position:absolute;inset:0;height:100%;padding:0;overflow:hidden}
+.instrument-app-page .instrument-section,.instrument-app-page .instrument-layout{height:100%;min-height:0;margin:0;display:block}
+
+.instrument-app-page .instrument-stage{
+  position:absolute;
+  inset:0;
+  height:100%;
+  border:0;
+  border-radius:0;
+  background:#dceaf2;
+  box-shadow:none;
+}
+.instrument-app-page .instrument-stage::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;background:linear-gradient(90deg,rgba(4,16,26,.52),transparent 31%,transparent 69%,rgba(4,16,26,.52)),linear-gradient(180deg,rgba(5,17,27,.38),transparent 26%,transparent 76%,rgba(3,12,20,.46))}
+.instrument-app-page .instrument-stage canvas{position:absolute;inset:0}
+
+.instrument-app-page .instrument-list,.instrument-app-page .instrument-info,.instrument-app-page .instrument-stage-toolbar,.instrument-app-page .instrument-part-tabs{
+  z-index:12;
+  color:var(--lab-text);
+  border:1px solid var(--lab-line);
+  background:var(--lab-glass);
+  box-shadow:inset 0 1px rgba(255,255,255,.14),0 18px 42px rgba(3,12,21,.26);
+  backdrop-filter:blur(22px) saturate(135%);
+  -webkit-backdrop-filter:blur(22px) saturate(135%);
+}
+
+.instrument-app-page .instrument-list{position:absolute;left:18px;top:108px;bottom:24px;width:278px;padding:10px;gap:7px;border-radius:20px;overflow:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent}
+.instrument-app-page .instrument-list>button{min-height:88px;padding:11px;border:1px solid rgba(225,243,255,.13);border-radius:13px;background:rgba(228,243,253,.06);color:var(--lab-muted);box-shadow:none}
+.instrument-app-page .instrument-list>button:hover{transform:none;background:rgba(71,158,231,.13);border-color:rgba(121,198,255,.27)}
+.instrument-app-page .instrument-list>button.active{background:linear-gradient(135deg,rgba(41,129,210,.35),rgba(58,153,225,.13));border-color:rgba(112,196,255,.45);box-shadow:inset 3px 0 #55b6ff,0 9px 24px rgba(2,11,19,.14)}
+.instrument-app-page .instrument-list strong{font-size:.72rem;color:var(--lab-text)}
+.instrument-app-page .instrument-list small{font-size:.62rem;line-height:1.4;color:var(--lab-muted)!important}
+.instrument-app-page .instrument-thumb{width:48px;height:52px;background:radial-gradient(circle,rgba(89,190,255,.2),transparent 70%)}
+
+.instrument-app-page .instrument-info{position:absolute;right:18px;top:108px;bottom:24px;width:304px;padding:20px;border-radius:20px;overflow:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent}
+.instrument-app-page .instrument-info>.eyebrow{color:#74c9ff;font-size:.61rem}.instrument-app-page .instrument-info h3{color:var(--lab-text);font-size:1.25rem;margin:6px 0 17px}
+.instrument-app-page .instrument-info dl>div{padding:13px 0;border-color:rgba(225,243,255,.13)}
+.instrument-app-page .instrument-info dt{color:#81a0b6;font-size:.59rem}.instrument-app-page .instrument-info dd{color:#e6f2f8;font-size:.7rem;line-height:1.45}
+.instrument-app-page .selected-part{margin-top:18px;padding:14px;border-radius:14px;border:1px solid rgba(108,194,255,.28);background:rgba(45,139,215,.14)}
+.instrument-app-page .selected-part span{color:#92b2c6;font-size:.59rem}.instrument-app-page .selected-part strong{color:#83d1ff;font-size:.75rem}.instrument-app-page .selected-part p{color:#c1d4e0!important;font-size:.66rem;line-height:1.5}
+
+.instrument-app-page .instrument-stage-toolbar{position:absolute;top:108px;left:316px;right:342px;height:48px;padding:0 10px 0 15px;border-radius:15px}
+.instrument-app-page .instrument-stage-toolbar>span{color:var(--lab-text);font-size:.68rem}.instrument-app-page .instrument-stage-toolbar button{height:32px;color:var(--lab-muted);border-color:rgba(225,243,255,.14);background:rgba(225,243,255,.07);font-size:.62rem}
+.instrument-app-page .instrument-stage-toolbar button:hover,.instrument-app-page .instrument-stage-toolbar button:focus-visible{color:white;background:rgba(78,168,235,.2);border-color:rgba(120,198,255,.32);outline:none}
+
+.instrument-app-page .instrument-part-tabs{bottom:26px;padding:5px;border-radius:14px;background:var(--lab-glass-soft)}
+.instrument-app-page .instrument-part-tabs button{min-height:36px;padding:8px 14px;color:var(--lab-muted);font-size:.64rem;border-radius:9px}
+.instrument-app-page .instrument-part-tabs button:hover{color:white;background:rgba(225,243,255,.08)}
+.instrument-app-page .instrument-part-tabs button.active{color:white;background:#287fca;box-shadow:0 8px 20px rgba(15,90,154,.3)}
+
+@media(max-width:1050px){
+  .instrument-app-chip{display:none}
+  .instrument-app-page .instrument-list{width:226px}
+  .instrument-app-page .instrument-info{width:250px}
+  .instrument-app-page .instrument-stage-toolbar{left:264px;right:288px}
+}
+
+@media(max-width:760px){
+  .instrument-app-page .app-page-header{top:8px;left:8px;right:8px;height:64px;padding:0 11px;border-radius:16px}
+  .instrument-app-title{gap:9px}.instrument-app-title>.brand .brand-name,.instrument-app-title>i,.instrument-app-title p{display:none}.instrument-app-title h1{font-size:.92rem!important}.instrument-app-title span{font-size:.53rem}
+  .instrument-return{width:38px;padding:0;justify-content:center}.instrument-return span{display:none}
+  .instrument-app-page .instrument-list{left:8px;right:8px;top:82px;bottom:auto;width:auto;height:80px;padding:6px;flex-direction:row;overflow-x:auto;overflow-y:hidden;border-radius:15px}
+  .instrument-app-page .instrument-list>button{min-width:180px;min-height:66px;height:66px;padding:7px 9px}.instrument-app-page .instrument-thumb{width:38px;height:45px;transform:scale(.78)}
+  .instrument-app-page .instrument-info{left:8px;right:8px;top:auto;bottom:8px;width:auto;height:176px;padding:14px 16px;border-radius:16px}
+  .instrument-app-page .instrument-info h3{font-size:1rem;margin:3px 0 8px}.instrument-app-page .instrument-info dl{display:grid;grid-template-columns:1fr 1fr;gap:0 15px}.instrument-app-page .instrument-info dl>div{padding:7px 0}.instrument-app-page .selected-part{margin-top:9px}
+  .instrument-app-page .instrument-stage-toolbar{top:172px;left:8px;right:8px;height:42px;border-radius:13px}
+  .instrument-app-page .instrument-part-tabs{bottom:194px;width:max-content;max-width:calc(100% - 16px);overflow-x:auto}.instrument-app-page .instrument-part-tabs button{min-height:32px;padding:6px 10px}
+  .instrument-app-page .instrument-stage::after{background:linear-gradient(180deg,rgba(4,16,26,.34),transparent 36%,transparent 61%,rgba(3,12,20,.46))}
+}
+
+@media(max-width:480px){
+  .instrument-app-page .instrument-stage-toolbar>span{font-size:.59rem}.instrument-app-page .instrument-stage-toolbar button:first-child{font-size:0;width:34px;padding:0;justify-content:center}
+  .instrument-app-page .instrument-info{height:164px}.instrument-app-page .instrument-info dl{grid-template-columns:1fr}.instrument-app-page .instrument-info dl>div:nth-child(n+3){display:none}.instrument-app-page .selected-part{position:absolute;left:50%;right:12px;top:39px;margin:0;padding:9px}.instrument-app-page .selected-part p{display:none}
+  .instrument-app-page .instrument-part-tabs{bottom:182px}
+}
+
+@media(prefers-reduced-motion:reduce){.instrument-app-page *{scroll-behavior:auto!important;transition:none!important}}

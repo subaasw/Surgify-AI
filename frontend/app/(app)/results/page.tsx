@@ -19,20 +19,22 @@ export default function ResultsPage() {
   const result: SavedResult|null = state.runStatus === "complete" ? state : saved;
   if (!result) return <div className="app-page results-app-page"><header className="app-page-header"><div><h1>Performance review</h1><p>Complete a scenario to generate a debrief.</p></div></header><div className="app-page-content result-content"><section className="no-result-state"><span><Target size={24}/></span><h2>No completed simulation yet</h2><p>Your sequence, accuracy, safety checks, and coach timeline will appear here after a completed run.</p><Link href="/scenarios" className="button button-primary button-md"><ArrowLeft size={14}/>Choose a scenario</Link></section></div></div>;
 
-  const score = result.score;
+  const completedSteps = Array.isArray(result.completedSteps) ? result.completedSteps : [];
+  const completedActions = Array.isArray(result.completedActions) ? result.completedActions : [];
+  const events = Array.isArray(result.events) ? result.events : [];
+  const score = Number.isFinite(result.score) ? result.score : 0;
   const positionAccuracy = Math.max(0, Math.round(100 - Math.abs((result.suturePosition ?? 50) - 50) * 2));
   const angleAccuracy = Math.max(0, Math.round(100 - Math.abs((result.sutureAngle ?? 52) - 52) * 2));
-  const safety = result.completedActions.includes("safety") ? 100 : 60;
+  const safety = completedActions.includes("safety") ? 100 : 60;
   const metrics = [
-    ["Patient assessment", result.completedSteps.filter(id => ["review","identify","assess"].includes(id)).length / 3 * 100, UserCheck],
-    ["Procedure sequence", result.completedSteps.length / procedureSteps.length * 100, TrendingUp],
-    ["Instrument selection", ["Needle holder","Forceps"].every(item => result.completedActions.includes(item)) ? 100 : 50, MousePointer2],
+    ["Patient assessment", completedSteps.filter(id => ["review","identify","assess"].includes(id)).length / 3 * 100, UserCheck],
+    ["Procedure sequence", completedSteps.length / procedureSteps.length * 100, TrendingUp],
+    ["Instrument selection", ["Needle holder","Forceps"].every(item => completedActions.includes(item)) ? 100 : 50, MousePointer2],
     ["Entry-point accuracy", positionAccuracy, Crosshair],
     ["Tool-angle accuracy", angleAccuracy, Target],
     ["Movement control", score, Activity],
     ["Safety checks", safety, ShieldCheck],
   ] as const;
-  const events = result.events ?? [];
   const mistakes = events.filter(event => event.tone === "warning" || event.tone === "error");
   const correct = events.filter(event => event.tone === "success").slice(-6);
   const retry = () => { resetSimulation(); router.push("/simulation?scenario=forearm"); };
