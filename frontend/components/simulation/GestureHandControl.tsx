@@ -97,6 +97,24 @@ const HAND_MENU: MenuItem[] = [
 // a pinch selects a menu item, so grabbing is suppressed to avoid double meaning.
 export const interactionState = { menuOpen: false, surgeryActive: false };
 
+/** Meshes hands should rest on top of (patient body, etc.), registered by the scene. */
+export const collisionMeshes: THREE.Object3D[] = [];
+const surfaceRay = new THREE.Raycaster();
+const rayFrom = new THREE.Vector3();
+const RAY_DOWN = new THREE.Vector3(0, -1, 0);
+
+/** True surface height under (x,z): the real patient mesh via raycast, else the analytic bed/tray/floor. */
+function surfaceUnder(x: number, z: number) {
+  let y = sceneSurfaceYAt(x, z);
+  if (collisionMeshes.length) {
+    rayFrom.set(x, 5, z);
+    surfaceRay.set(rayFrom, RAY_DOWN);
+    const hit = surfaceRay.intersectObjects(collisionMeshes, true)[0];
+    if (hit) y = Math.max(y, hit.point.y);
+  }
+  return y;
+}
+
 function controlLabel(target: HTMLElement | null) {
   if (!target) return "";
   return (target.getAttribute("aria-label") || target.getAttribute("title") || target.textContent || "Control")
@@ -692,12 +710,13 @@ function RiggedHand({ side, mode }: { side: Side; mode: Exclude<CameraMode, "web
     tips.thumb.getWorldPosition(tipA);
     tips.index.getWorldPosition(tipB);
     tipA.add(tipB).multiplyScalar(.5);
-    // Lift the whole hand by its deepest wrist/fingertip/tool penetration.
+    // Lift the whole hand by its deepest wrist/fingertip/tool penetration against
+    // whatever solid surface is under them — the real patient mesh (raycast) or bed/tray/floor.
     let lift = mode === "tray" ? 0 : hw.contactLift;
     hw.contactLift = 0;
     if (mode !== "tray") for (const point of contactTips) {
         point.getWorldPosition(contactPoint);
-        lift = Math.max(lift, sceneSurfaceYAt(contactPoint.x, contactPoint.z) - contactPoint.y);
+        lift = Math.max(lift, surfaceUnder(contactPoint.x, contactPoint.z) - contactPoint.y);
       }
     if (lift > 0) {
       group.position.y += lift;

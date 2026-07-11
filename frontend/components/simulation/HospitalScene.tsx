@@ -9,7 +9,7 @@ import { SceneErrorBoundary } from "@/components/anatomy/SceneErrorBoundary";
 import { useSimulation } from "./SimulationProvider";
 import type { CameraMode } from "@/types/simulation";
 import { MedicalGLB, ModelErrorBoundary, SafeMedicalGLB } from "./ModelRegistry";
-import { GestureHand, HandTrackingDriver, handWorld } from "./GestureHandControl";
+import { GestureHand, HandTrackingDriver, handWorld, collisionMeshes } from "./GestureHandControl";
 import { SurgicalPhysics, TOOL_ASSETS, surgerySite } from "./HandPhysics";
 import { MODEL_PATHS } from "@/data/modelConfig";
 import { WoundSurface } from "./WoundSurface";
@@ -202,6 +202,13 @@ function SurgicalDrape({ anatomy }: { anatomy: boolean }) {
 
 function LoadedPatient({ selected, anatomy, stitchPhase, selectedTool, onSelect }: PatientProps) {
   const breathing = useRef<THREE.Group>(null);
+  // register the body mesh so hands raycast against it and rest on its surface
+  useEffect(() => {
+    const body = breathing.current;
+    if (!body) return;
+    collisionMeshes.push(body);
+    return () => { const i = collisionMeshes.indexOf(body); if (i >= 0) collisionMeshes.splice(i, 1); };
+  }, []);
   useFrame(({ clock }) => {
     if (breathing.current) breathing.current.position.y = 1.74 + Math.sin(clock.elapsedTime * 1.35) * .008;
   });
