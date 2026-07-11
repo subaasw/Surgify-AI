@@ -36,12 +36,14 @@ export type HandWorldState = {
   /** World-space midpoint between thumb and index fingertips — where a pinched object sits. */
   pinchPoint: THREE.Vector3;
   velocity: THREE.Vector3;
+  /** How far the hand reaches into the field, 0 (pulled back) → 1 (deep over patient). Drives POV zoom. */
+  reach: number;
 };
 
 const emptyHandWorld = (): HandWorldState => ({
   live: false, pinch: false, gesture: "",
   position: new THREE.Vector3(), quaternion: new THREE.Quaternion(),
-  pinchPoint: new THREE.Vector3(), velocity: new THREE.Vector3(),
+  pinchPoint: new THREE.Vector3(), velocity: new THREE.Vector3(), reach: 0,
 });
 
 /** World-space pose of each rendered surgeon hand, written per frame by RiggedHand for the physics layer. */
@@ -340,6 +342,9 @@ export function HandTrackingDriver() {
           baseOptions: { modelAssetPath: MODEL_PATH, delegate },
           runningMode: "VIDEO" as const,
           numHands: 2,
+          minHandDetectionConfidence: .6, // fewer phantom hands from background clutter
+          minHandPresenceConfidence: .6,
+          minTrackingConfidence: .6, // steadier landmarks once a hand is locked
           cannedGesturesClassifierOptions: { scoreThreshold: .4 }, // default misses casual thumbs-up
         });
         recognizer = await GestureRecognizer.createFromOptions(fileset, options("GPU"))
@@ -586,6 +591,7 @@ function RiggedHand({ side }: { side: Side }) {
     hw.quaternion.copy(rotGroup.quaternion);
     hw.pinch = live.pinch;
     hw.gesture = live.gesture;
+    hw.reach = pose.screen.depth;
     hw.live = true;
 
     const stats = tracker.update(a.x.value, a.y.value, a.z.value, delta);

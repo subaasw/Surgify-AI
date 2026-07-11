@@ -9,7 +9,7 @@ import { SceneErrorBoundary } from "@/components/anatomy/SceneErrorBoundary";
 import { useSimulation } from "./SimulationProvider";
 import type { CameraMode } from "@/types/simulation";
 import { MedicalGLB, ModelErrorBoundary, SafeMedicalGLB } from "./ModelRegistry";
-import { GestureHand, HandTrackingDriver } from "./GestureHandControl";
+import { GestureHand, HandTrackingDriver, handWorld } from "./GestureHandControl";
 import { SurgicalPhysics, TOOL_ASSETS } from "./HandPhysics";
 import { MODEL_PATHS } from "@/data/modelConfig";
 import { WoundSurface } from "./WoundSurface";
@@ -25,6 +25,15 @@ const presets: Record<Exclude<CameraMode, "webcam"> | "pov", { position: [number
 };
 const cameraBounds = { min: new THREE.Vector3(-3.55, .45, -5.95), max: new THREE.Vector3(3.55, 5.1, 6.35) };
 
+// hand-driven POV dolly: reach into the field pulls the camera from a wide
+// establishing shot toward a close-up centred on where the hands are working.
+const POV_WIDE = 5.7; // dolly distance (world units) when hands are pulled back
+const POV_NEAR = 2.5; // dolly distance when reaching deep over the patient
+const povDir = new THREE.Vector3();
+const povPinch = new THREE.Vector3();
+const povWantCenter = new THREE.Vector3();
+const povTargetPos = new THREE.Vector3();
+
 export function HospitalScene() {
   const { state, selectRegion } = useSimulation();
   const patientProps = { selected: state.selectedRegion, anatomy: state.anatomyOverlay, stitchPhase: state.stitchPhase, selectedTool: state.selectedTool, onSelect: selectRegion };
@@ -36,6 +45,8 @@ export function HospitalScene() {
 function CameraRig({ mode }: { mode: Exclude<CameraMode, "webcam"> | "pov" }) {
   const controls = useRef<OrbitControlsImpl>(null);
   const transitioning = useRef(true);
+  const povDist = useRef(POV_WIDE);
+  const povCenter = useRef(new THREE.Vector3(...presets.pov.target));
   const { camera } = useThree();
   useEffect(() => { transitioning.current = true; }, [mode]);
   useFrame((_, delta) => {
@@ -49,6 +60,32 @@ function CameraRig({ mode }: { mode: Exclude<CameraMode, "webcam"> | "pov" }) {
       camera.position.lerp(position, rate);
       control.target.lerp(target, rate);
       if (camera.position.distanceTo(position) < .035 && control.target.distanceTo(target) < .035) transitioning.current = false;
+    }
+    // POV zoom: once settled and hands are tracked, dolly by average reach and
+    // recentre on the hands; idle (no hands) leaves the user's mouse in charge
+    if (mode === "pov" && !transitioning.current) {
+      const live = [handWorld.Right, handWorld.Left].filter(h => h.live);
+      if (live.length) {
+        let reach = 0;
+        povPinch.set(0, 0, 0);
+        for (const h of live) { reach += h.reach; povPinch.add(h.pinchPoint); }
+        reach /= live.length;
+        povPinch.divideScalar(live.length);
+        const lean = THREE.MathUtils.smoothstep(reach, .1, .95);
+        povWantCenter.set(...presets.pov.target).lerp(povPinch, lean * .6);
+        const ease = 1 - Math.pow(.015, delta);
+        povDist.current = THREE.MathUtils.lerp(povDist.current, THREE.MathUtils.lerp(POV_WIDE, POV_NEAR, lean), ease);
+        povCenter.current.lerp(povWantCenter, ease);
+        povDir.copy(camera.position).sub(control.target);
+        if (povDir.lengthSq() < 1e-6) povDir.set(0, .5, 1);
+        povDir.normalize();
+        control.target.lerp(povCenter.current, ease);
+        povTargetPos.copy(control.target).addScaledVector(povDir, povDist.current);
+        camera.position.lerp(povTargetPos, ease);
+      } else { // hold state so re-entry from mouse control is seamless
+        povDist.current = camera.position.distanceTo(control.target);
+        povCenter.current.copy(control.target);
+      }
     }
     control.target.x = THREE.MathUtils.clamp(control.target.x, -3.2, 3.2);
     control.target.y = THREE.MathUtils.clamp(control.target.y, .55, 3.1);
