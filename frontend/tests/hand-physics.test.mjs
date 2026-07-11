@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { WORKSPACE, damp, fingerCurls, fingerDirs, palmPose, rangeValueAt, relativeCursorAt, springStep, stablePinch } from "../lib/handPhysics.mjs";
+import { WORKSPACE, damp, fingerCurls, fingerDirs, palmPose, patientSurfaceYAt, rangeValueAt, relativeCursorAt, springStep, stablePinch } from "../lib/handPhysics.mjs";
 
 // flat hand facing the camera: wrist below knuckles, index left of pinky (right hand)
 function flatHand(over = {}) {
@@ -161,6 +161,13 @@ test("relative cursor stays parked on re-pinch and moves by hand delta", () => {
   assert.deepEqual(relativeCursorAt({ x: .2, y: .3 }, { x: .2, y: .3 }, parked, bounds), parked);
   assert.deepEqual(relativeCursorAt({ x: .3, y: .4 }, { x: .2, y: .3 }, parked, bounds, 1), { x: 700, y: 300 });
   assert.deepEqual(relativeCursorAt({ x: 2, y: -2 }, { x: 0, y: 0 }, parked, bounds), { x: 1000, y: 0 });
+});
+
+test("patient collision envelope covers head, torso, arm, and leaves the tray clear", () => {
+  assert.equal(patientSurfaceYAt(0, -1.72), 2.08);
+  assert.equal(patientSurfaceYAt(0, -.5), 2.02);
+  assert.equal(patientSurfaceYAt(-.62, 0), 1.98);
+  assert.equal(patientSurfaceYAt(2.8, -.62), null);
 });
 
 test("stablePinch emits one press and one release per stable gesture", () => {

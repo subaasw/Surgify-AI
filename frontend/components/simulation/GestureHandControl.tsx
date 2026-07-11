@@ -10,7 +10,7 @@ import { ModelErrorBoundary } from "./ModelRegistry";
 import { useSimulation } from "./SimulationProvider";
 import { MODEL_PATHS } from "@/data/modelConfig";
 import { procedureSteps } from "@/data/simulationData";
-import { LandmarkFilter, WORKSPACE, classifyPose, damp, fingerDirs, palmPose, rangeValueAt, relativeCursorAt, springStep, stablePinch } from "@/lib/handPhysics.mjs";
+import { LandmarkFilter, WORKSPACE, classifyPose, damp, fingerDirs, palmPose, patientSurfaceYAt, rangeValueAt, relativeCursorAt, springStep, stablePinch } from "@/lib/handPhysics.mjs";
 import { MotionTracker, motionStats } from "@/lib/handMetrics.mjs";
 
 type Landmark = { x: number; y: number; z: number };
@@ -500,10 +500,11 @@ function RiggedHand({ side }: { side: Side }) {
     const tips = { thumb: chainOf.thumb[chainOf.thumb.length - 1], index: chainOf.index[chainOf.index.length - 1] };
     return { rig, restQuatInv: basisQuat(across, up, forward).invert(), restPalm: { across, up, forward }, fingers, tips };
   }, [scene, side]);
-  const tracker = useMemo(() => new MotionTracker(), []);
+  const trackerRef = useRef(new MotionTracker());
   useEffect(() => () => { handWorld[side].live = false; motionStats[side].live = false; }, [side]);
 
   useFrame((_, delta) => {
+    const tracker = trackerRef.current;
     const group = root.current;
     const rotGroup = rot.current;
     if (!group || !rotGroup) return;
@@ -545,7 +546,8 @@ function RiggedHand({ side }: { side: Side }) {
     springStep(a.z, targetZ, delta, 170, 26);
     cameraLocal.set(a.x.value, a.y.value, a.z.value);
     cameraWorld.copy(cameraLocal).applyQuaternion(camera.quaternion).add(camera.position);
-    cameraWorld.y = Math.max(cameraWorld.y, WORKSPACE.floorY);
+    const patientSurface = patientSurfaceYAt(cameraWorld.x, cameraWorld.z);
+    cameraWorld.y = Math.max(cameraWorld.y, (patientSurface ?? 1.15) + .14);
     group.position.copy(cameraWorld);
     rotGroup.quaternion.slerp(worldQuat, damp(20, delta));
 

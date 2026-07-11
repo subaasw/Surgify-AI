@@ -2,9 +2,9 @@ export const procedureSteps = [
   { id: "review", title: "Verify the case", instruction: "Confirm patient identity, injury history, and allergy status.", hint: "Ask about allergies, then confirm the review in the patient panel." },
   { id: "identify", title: "Identify the procedure site", instruction: "Inspect the patient and select the injured right forearm.", hint: "Use the reported pain location to identify the correct site." },
   { id: "assess", title: "Complete the neurovascular check", instruction: "Check distal pulse, sensation, and finger movement.", hint: "Document all three findings before preparing the field." },
-  { id: "prepare", title: "Establish the sterile field", instruction: "Apply gloves, cleanse the synthetic pad, and place a sterile drape.", hint: "The action dock shows only the required preparation items." },
+  { id: "prepare", title: "Establish the sterile field", instruction: "Apply gloves, cleanse the virtual forearm, and place a sterile drape.", hint: "The action dock shows only the required preparation items." },
   { id: "instruments", title: "Prepare closure instruments", instruction: "Confirm the needle holder and forceps before the hands-on exercise.", hint: "Select both instruments; the needle holder remains active." },
-  { id: "incision", title: "Create the practice incision", instruction: "Use the scalpel to trace the guide on the synthetic training pad.", hint: "This is a non-graphic skills pad, not an incision on the patient." },
+  { id: "incision", title: "Create the guided incision", instruction: "Use the scalpel to trace the guide directly on the virtual patient's forearm.", hint: "The layered virtual patient remains educational and non-graphic." },
   { id: "suture", title: "Place one interrupted suture", instruction: "Align, match the angle, pass the needle, pull through, tie, and trim.", hint: "Complete the guided phases in order; the scene responds to each phase." },
   { id: "complete", title: "Reassess and finish", instruction: "Inspect approximation, confirm safety, and complete the scenario.", hint: "Finish only after the knot is secure and the suture is trimmed." },
 ] as const;

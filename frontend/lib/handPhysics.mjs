@@ -40,6 +40,16 @@ export function relativeCursorAt(pointer, handAnchor, cursorAnchor, bounds, gain
   };
 }
 
+/** Cheap collision envelope matching the layered patient lying along world Z. */
+export function patientSurfaceYAt(x, z) {
+  if ((x / .34) ** 2 + ((z + 1.72) / .38) ** 2 <= 1) return 2.08;
+  if (Math.abs(x) <= .46 && z >= -1.34 && z <= .22) return 2.02;
+  if (Math.abs(Math.abs(x) - .62) <= .18 && z >= -.9 && z <= .78) return 1.98;
+  if (Math.abs(x) <= .38 && z > .22 && z <= .72) return 1.94;
+  if (Math.abs(Math.abs(x) - .24) <= .2 && z > .72 && z <= 2.06) return 1.86;
+  return null;
+}
+
 /**
  * Two-frame pinch debounce. Returns a new tiny state object and emits only on
  * stable edges, so holding a pinch cannot repeatedly activate a control.

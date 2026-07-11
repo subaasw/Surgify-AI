@@ -5,7 +5,7 @@ import { Camera, CameraOff, Hand, RefreshCw, ScanLine } from "lucide-react";
 import { FilesetResolver, GestureRecognizer } from "@mediapipe/tasks-vision";
 import { LandmarkFilter, classifyPose } from "@/lib/handPhysics.mjs";
 import { useSimulation } from "./SimulationProvider";
-import { handStore, type TrackedHand } from "./GestureHandControl";
+import { handStore } from "./GestureHandControl";
 
 type TrackingStatus = "idle" | "requesting" | "connecting" | "active" | "failed";
 
@@ -43,7 +43,7 @@ export function WebcamPractice() {
   const [pinching, setPinching] = useState(false);
   const { state, setCameraMode, selectRegion, selectTool, releaseTool } = useSimulation();
   const sim = useRef({ selectedTool: state.selectedTool, selectRegion, selectTool, releaseTool });
-  sim.current = { selectedTool: state.selectedTool, selectRegion, selectTool, releaseTool };
+  useEffect(() => { sim.current = { selectedTool: state.selectedTool, selectRegion, selectTool, releaseTool }; }, [state.selectedTool, selectRegion, selectTool, releaseTool]);
 
   const stopCamera = useCallback(() => {
     if (loopRef.current !== null) cancelAnimationFrame(loopRef.current);

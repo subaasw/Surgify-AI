@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { ContactShadows, Environment, Html, Lightformer, Line, OrbitControls, RoundedBox } from "@react-three/drei";
+import { ContactShadows, Environment, Html, Lightformer, Line, OrbitControls, RoundedBox, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { SceneErrorBoundary } from "@/components/anatomy/SceneErrorBoundary";
@@ -18,9 +18,9 @@ const presets: Record<Exclude<CameraMode, "webcam"> | "pov", { position: [number
   // first-person surgeon view: hands enter from the bottom edge like VR
   pov: { position: [0, 3.5, 4.3], target: [0, 1.35, -1] },
   room: { position: [3.45, 4.7, 5.9], target: [0, 1.15, 0] },
-  patient: { position: [3.35, 3.4, 4.7], target: [0, 1.45, 0] },
-  closeup: { position: [-1.3, 2.1, 0.4], target: [-1.05, 1.48, -0.15] },
-  anatomy: { position: [3.35, 2.8, 4.2], target: [-.4, 1.5, .1] },
+  patient: { position: [3.35, 3.4, 4.7], target: [0, 1.7, 0] },
+  closeup: { position: [-1.3, 2.5, 0.8], target: [-.62, 1.98, .18] },
+  anatomy: { position: [3.35, 2.8, 4.2], target: [0, 1.72, .1] },
   tray: { position: [3.35, 3.3, -.2], target: [2.7, 1.15, -.7] },
 };
 const cameraBounds = { min: new THREE.Vector3(-3.55, .45, -5.95), max: new THREE.Vector3(3.55, 5.1, 6.35) };
@@ -126,6 +126,76 @@ export function FallbackHospitalBed() {
 
 type PatientProps = { selected: string | null; anatomy: boolean; stitchPhase: number; selectedTool: string | null; onSelect: (region: string) => void };
 
+// All five Man assets share this HumanBody.glb coordinate system. Keeping one
+// transform is what makes the independently exported layers line up exactly.
+const MAN_CENTER = new THREE.Vector3(0, .87148, -.00135);
+const MAN_SCALE = 3.85 / 1.74372;
+type ManLayerKind = "skin" | "muscle" | "bone" | "vascular" | "nerve";
+
+function ManLayer({ path, kind, color, opacity = 1, preservePalette = false }: { path: string; kind: ManLayerKind; color: string; opacity?: number; preservePalette?: boolean }) {
+  const { scene } = useGLTF(path);
+  const model = useMemo(() => {
+    const clone = scene.clone(true);
+    clone.traverse(object => {
+      if (!(object instanceof THREE.Mesh)) return;
+      object.castShadow = kind === "skin";
+      object.receiveShadow = kind === "skin";
+      object.renderOrder = kind === "skin" ? 4 : kind === "muscle" ? 3 : 2;
+      const paint = (source: THREE.Material) => {
+        const authored = source.clone() as THREE.MeshStandardMaterial;
+        const hasMap = "map" in authored && Boolean(authored.map);
+        if (preservePalette && hasMap) {
+          authored.transparent = opacity < 1;
+          authored.opacity = opacity;
+          authored.depthWrite = opacity >= 1;
+          if ("roughness" in authored) authored.roughness = Math.max(authored.roughness ?? 0, .58);
+          return authored;
+        }
+        const name = source.name.toLowerCase();
+        const materialColor = kind === "skin" && name.includes("black") ? "#26282b"
+          : kind === "skin" && name.includes("nail") ? "#dfb9ad"
+          : color;
+        return new THREE.MeshStandardMaterial({
+          color: materialColor,
+          roughness: kind === "bone" ? .7 : .78,
+          metalness: 0,
+          vertexColors: Boolean(object.geometry.getAttribute("color")),
+          transparent: opacity < 1,
+          opacity,
+          depthWrite: opacity >= 1,
+        });
+      };
+      const materials = (Array.isArray(object.material) ? object.material : [object.material]).map(paint);
+      object.material = Array.isArray(object.material) ? materials : materials[0];
+    });
+    clone.scale.setScalar(MAN_SCALE);
+    clone.position.copy(MAN_CENTER).multiplyScalar(-MAN_SCALE);
+    return clone;
+  }, [scene, kind, color, opacity, preservePalette]);
+  return <primitive object={model} />;
+}
+
+function InternalPatientLayers() {
+  return <ModelErrorBoundary fallback={<group />}><Suspense fallback={null}>
+    <ManLayer path={MODEL_PATHS.patientMuscular} kind="muscle" color="#b9474f" opacity={.42} preservePalette />
+    <ManLayer path={MODEL_PATHS.patientSkeletal} kind="bone" color="#e8dfc7" opacity={.82} preservePalette />
+    <ManLayer path={MODEL_PATHS.patientCardiovascular} kind="vascular" color="#b73543" opacity={.9} preservePalette />
+    <ManLayer path={MODEL_PATHS.patientNervous} kind="nerve" color="#e6c75b" opacity={.9} preservePalette />
+  </Suspense></ModelErrorBoundary>;
+}
+
+function SurgicalDrape({ anatomy }: { anatomy: boolean }) {
+  return <group position={[0, .29, .57]}>
+    <RoundedBox args={[1.12, .035, 1.08]} radius={.07} castShadow receiveShadow>
+      <meshStandardMaterial color="#27806f" roughness={.96} transparent={anatomy} opacity={anatomy ? .4 : 1} />
+    </RoundedBox>
+    {[-.28, 0, .28].map((z) => <mesh key={z} position={[0, .022, z]} receiveShadow>
+      <boxGeometry args={[.9, .008, .018]} />
+      <meshStandardMaterial color="#1f685d" roughness={1} transparent={anatomy} opacity={anatomy ? .3 : .55} />
+    </mesh>)}
+  </group>;
+}
+
 function LoadedPatient({ selected, anatomy, stitchPhase, selectedTool, onSelect }: PatientProps) {
   const breathing = useRef<THREE.Group>(null);
   useFrame(({ clock }) => {
@@ -133,7 +203,11 @@ function LoadedPatient({ selected, anatomy, stitchPhase, selectedTool, onSelect 
   });
   return <group>
     <group ref={breathing} position={[0, 1.74, -.05]}>
-      <MedicalGLB path={MODEL_PATHS.patient} targetSize={3.85} preserveTextures castShadows={false} opacity={anatomy ? .38 : 1} />
+      <group rotation={[-Math.PI / 2, 0, 0]}>
+        <ManLayer path={MODEL_PATHS.patient} kind="skin" color="#c99078" opacity={anatomy ? .16 : 1} />
+        {anatomy && <InternalPatientLayers />}
+      </group>
+      <SurgicalDrape anatomy={anatomy} />
     </group>
     <PatientInteractionZones selected={selected} anatomy={anatomy} stitchPhase={stitchPhase} selectedTool={selectedTool} onSelect={onSelect} />
   </group>;
@@ -147,14 +221,14 @@ function LoadedLegacyPatient({ selected, anatomy, stitchPhase, selectedTool, onS
 }
 
 function PatientInteractionZones({ selected, anatomy, onSelect }: PatientProps) {
-  return <group position={[0, 1.55, -.08]}>
+  return <group position={[0, 1.72, -.08]}>
     <group position={[0,.18,-1.65]}><Region region="Head" selected={selected} onSelect={onSelect}><mesh scale={[.48,.4,.55]}><sphereGeometry args={[1,16,12]} /><HitMaterial /></mesh></Region></group>
     <group position={[0,.1,-.62]}><Region region="Chest" selected={selected} onSelect={onSelect}><mesh rotation={[Math.PI/2,0,0]} scale={[.9,.56,1]}><capsuleGeometry args={[.48,1.05,8,14]} /><HitMaterial /></mesh></Region>{anatomy&&<TorsoAnatomy />}</group>
     <group position={[0,.08,.08]}><Region region="Abdomen" selected={selected} onSelect={onSelect}><mesh rotation={[Math.PI/2,0,0]} scale={[.8,.5,.82]}><capsuleGeometry args={[.45,.72,8,14]} /><HitMaterial /></mesh></Region></group>
-    <PatientArmZone label="Left arm" x={1.05} selected={selected} onSelect={onSelect} />
-    <PatientArmZone label="Right arm" x={-1.05} selected={selected} onSelect={onSelect} wound anatomy={anatomy} />
-    <PatientLegZone label="Left leg" x={.43} selected={selected} onSelect={onSelect} />
-    <PatientLegZone label="Right leg" x={-.43} selected={selected} onSelect={onSelect} />
+    <PatientArmZone label="Left arm" x={.62} selected={selected} onSelect={onSelect} />
+    <PatientArmZone label="Right arm" x={-.62} selected={selected} onSelect={onSelect} wound anatomy={anatomy} />
+    <PatientLegZone label="Left leg" x={.24} selected={selected} onSelect={onSelect} />
+    <PatientLegZone label="Right leg" x={-.24} selected={selected} onSelect={onSelect} />
   </group>;
 }
 
@@ -201,7 +275,7 @@ function Leg({ side, x, selected, anatomy, onSelect }: { side:"Left"|"Right";x:n
 
 function WoundTrainingPatch({ anatomy }: { anatomy:boolean }) {
   const { state } = useSimulation();
-  return <group position={[0, .18, .33]}><WoundSurface incisionProgress={state.incisionProgress} incisionComplete={state.incisionComplete} stitchPhase={state.stitchPhase} stitchProgress={state.stitchProgress} suturePosition={state.suturePosition} sutureAngle={state.sutureAngle} anatomy={anatomy} selectedTool={state.selectedTool} />{anatomy && <ForearmAnatomy />}</group>;
+  return <group position={[0, .18, .33]}><WoundSurface embedded incisionProgress={state.incisionProgress} incisionComplete={state.incisionComplete} stitchPhase={state.stitchPhase} stitchProgress={state.stitchProgress} suturePosition={state.suturePosition} sutureAngle={state.sutureAngle} anatomy={anatomy} selectedTool={state.selectedTool} />{anatomy && <ForearmAnatomy />}</group>;
 }
 
 function ForearmAnatomy(){return <group position={[0,.08,0]}><mesh position={[-.09,0,0]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[.025,.025,.6,12]}/><meshStandardMaterial color="#eee5c9"/></mesh><mesh position={[.09,0,0]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[.025,.025,.6,12]}/><meshStandardMaterial color="#eee5c9"/></mesh><Line points={[[-.14,.03,-.28],[-.12,.03,.28]]} color="#c6575d" lineWidth={2}/><Line points={[[.14,.03,-.28],[.11,.03,.28]]} color="#e1bc4f" lineWidth={1.5}/><Html position={[.28,.1,-.1]}><div className="anatomy-scene-labels"><span>Radius / ulna</span><span>Vessel path</span><span>Nerve path</span></div></Html></group>}

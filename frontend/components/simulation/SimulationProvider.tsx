@@ -119,7 +119,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     if (current.runStatus !== "active") return current;
     const selected = { ...current, selectedRegion: region, cameraMode: region === "Right arm" ? "closeup" as const : "patient" as const };
     if (region !== "Right arm") return addFeedback(selected, `${region} selected`, "The case history identifies the right forearm. Reassess the reported pain location.", "warning", -2);
-    if (current.currentStep === 1) return completeCurrentStep(selected, "identify", "Right forearm selected and the synthetic wound patch identified.");
+    if (current.currentStep === 1) return completeCurrentStep(selected, "identify", "Right forearm selected and the virtual incision site identified.");
     if (current.currentStep < 1) return addFeedback(selected, "Correct site found early", "Finish the patient review before examining the injury.", "warning", -1);
     return addFeedback(selected, "Right forearm focused", "The procedure site is in view.", "info");
   }), []);
@@ -176,7 +176,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       const completedActions = addAction(current.completedActions, action);
       const ready = preparationActions.every(item => completedActions.includes(item));
       const next = { ...current, completedActions };
-      if (ready) return completeCurrentStep(next, "prepare", "Gloves applied, synthetic surface cleansed, and sterile field established.");
+      if (ready) return completeCurrentStep(next, "prepare", "Gloves applied, virtual forearm cleansed, and sterile field established.");
       return addFeedback(next, action, `${preparationActions.filter(item => !completedActions.includes(item)).length} required preparation item${preparationActions.filter(item => !completedActions.includes(item)).length === 1 ? "" : "s"} remaining.`, "success");
     }
 

@@ -13,6 +13,7 @@ type WoundSurfaceProps = {
   sutureAngle: number;
   anatomy: boolean;
   selectedTool: string | null;
+  embedded?: boolean;
 };
 
 const ENTRY_X = -.14;
@@ -22,7 +23,7 @@ export function FallbackWound({ anatomy = false }: { anatomy?: boolean }) {
   return <RoundedBox args={[.56, .06, .82]} radius={.035} castShadow receiveShadow><meshPhysicalMaterial color="#d7a58d" roughness={.72} transparent={anatomy} opacity={anatomy ? .38 : 1} /></RoundedBox>;
 }
 
-export function WoundSurface({ incisionProgress, incisionComplete, stitchPhase, stitchProgress, suturePosition, sutureAngle, anatomy, selectedTool }: WoundSurfaceProps) {
+export function WoundSurface({ incisionProgress, incisionComplete, stitchPhase, stitchProgress, suturePosition, sutureAngle, anatomy, selectedTool, embedded = false }: WoundSurfaceProps) {
   const cutLength = Math.max(.018, incisionProgress * .58);
   const cutCenter = -.29 + cutLength / 2;
   const stitchZ = THREE.MathUtils.lerp(-.2, .2, suturePosition / 100);
@@ -48,8 +49,7 @@ export function WoundSurface({ incisionProgress, incisionComplete, stitchPhase, 
   }, [needleCurve, stitchPhase, stitchProgress, stitchZ]);
 
   return <group>
-    <FallbackWound anatomy={anatomy} />
-    <mesh position={[0, .033, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[.48, .72]} /><meshPhysicalMaterial color="#e0b09a" roughness={.82} clearcoat={.08} transparent={anatomy} opacity={anatomy ? .25 : .96} /></mesh>
+    {!embedded && <><FallbackWound anatomy={anatomy} /><mesh position={[0, .033, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[.48, .72]} /><meshPhysicalMaterial color="#e0b09a" roughness={.82} clearcoat={.08} transparent={anatomy} opacity={anatomy ? .25 : .96} /></mesh></>}
 
     {!incisionComplete && Array.from({ length: 8 }, (_, index) => <mesh key={index} position={[0, .068, -.255 + index * .073]}><boxGeometry args={[.012, .003, .038]} /><meshBasicMaterial color="#42bed0" transparent opacity={.7} /></mesh>)}
     {incisionProgress > 0 && <>
