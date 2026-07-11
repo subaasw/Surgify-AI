@@ -13,7 +13,7 @@ import { GestureHand, HandTrackingDriver, handWorld, collisionMeshes } from "./G
 import { SurgicalPhysics, TOOL_ASSETS, surgerySite } from "./HandPhysics";
 import { MODEL_PATHS } from "@/data/modelConfig";
 import { WoundSurface } from "./WoundSurface";
-import { guidedCameraMode } from "@/lib/handPhysics.mjs";
+import { damp, guidedCameraMode } from "@/lib/handPhysics.mjs";
 
 const presets: Record<Exclude<CameraMode, "webcam"> | "pov", { position: [number, number, number]; target: [number, number, number] }> = {
   // first-person surgeon view: hands enter from the bottom edge like VR
@@ -33,7 +33,6 @@ const POV_NEAR = 2.5; // dolly distance when reaching deep over the patient
 const povDir = new THREE.Vector3();
 const povPinch = new THREE.Vector3();
 const povWantCenter = new THREE.Vector3();
-const povTargetPos = new THREE.Vector3();
 
 export function HospitalScene() {
   const { state, selectRegion } = useSimulation();
@@ -42,14 +41,15 @@ export function HospitalScene() {
   const legacyPatient = <ModelErrorBoundary fallback={proceduralPatient}><Suspense fallback={proceduralPatient}><LoadedLegacyPatient {...patientProps} /></Suspense></ModelErrorBoundary>;
   const heldTools = Object.values(state.heldTools).filter((tool): tool is string => Boolean(tool));
   const cameraMode = guidedCameraMode(state.currentStep, state.stitchPhase, heldTools, state.trackingOverlay, state.cameraMode) as Exclude<CameraMode, "webcam"> | "pov";
-  const guided = state.trackingOverlay && state.currentStep >= 4;
-  return <SceneErrorBoundary>{state.trackingOverlay && <HandTrackingDriver />}<Canvas className="hospital-scene-canvas" shadows dpr={1} camera={{ position: presets.room.position, fov: 44, near: .1, far: 40 }} gl={{ antialias: true }}><color attach="background" args={["#02070b"]} /><fog attach="fog" args={["#091119", 12, 23]} /><ambientLight intensity={.72} /><hemisphereLight args={["#eaf5f7", "#26333a", 1.25]} /><directionalLight castShadow position={[4, 8, 5]} intensity={2.2} color="#f7fbfa" shadow-mapSize={[512, 512]} /><pointLight position={[-4, 3.5, 1]} intensity={1.2} color="#b8dcf2" /><Environment resolution={32}><Lightformer form="rect" intensity={1.2} color="#e9fbff" scale={[8, 3, 1]} position={[0, 6, -1]} rotation={[Math.PI / 2, 0, 0]} /></Environment><CameraRig mode={cameraMode} locked={guided} /><SafeMedicalGLB path={MODEL_PATHS.operationTheatre} targetSize={14} preserveMaterials castShadows={false} position={[0,1.66,0]} rotation={[0,Math.PI/2,0]} fallback={<HospitalRoom />} /><SafeMedicalGLB path={MODEL_PATHS.hospitalBed} targetSize={5.35} preserveMaterials position={[0,1.12,0]} fallback={<FallbackHospitalBed />} /><ModelErrorBoundary fallback={legacyPatient}><Suspense fallback={proceduralPatient}><LoadedPatient {...patientProps} /></Suspense></ModelErrorBoundary><FallbackMonitor /><IVStand /><InstrumentTray selectedTool={state.selectedTool} physical={state.trackingOverlay} />{state.trackingOverlay && <GestureHand mode={cameraMode} />}<SurgicalPhysics active={state.trackingOverlay} /><ContactShadows frames={1} resolution={192} position={[0, .02, 0]} opacity={.32} scale={15} blur={2.6} far={5} /></Canvas></SceneErrorBoundary>;
+  const guided = state.trackingOverlay && state.movementMode === "surgical" && state.currentStep >= 4;
+  return <SceneErrorBoundary>{state.trackingOverlay && <HandTrackingDriver />}<Canvas className="hospital-scene-canvas" shadows dpr={1} camera={{ position: presets.room.position, fov: 44, near: .1, far: 40 }} gl={{ antialias: true }}><color attach="background" args={["#02070b"]} /><fog attach="fog" args={["#091119", 12, 23]} /><ambientLight intensity={.72} /><hemisphereLight args={["#eaf5f7", "#26333a", 1.25]} /><directionalLight castShadow position={[4, 8, 5]} intensity={2.2} color="#f7fbfa" shadow-mapSize={[512, 512]} /><pointLight position={[-4, 3.5, 1]} intensity={1.2} color="#b8dcf2" /><Environment resolution={32}><Lightformer form="rect" intensity={1.2} color="#e9fbff" scale={[8, 3, 1]} position={[0, 6, -1]} rotation={[Math.PI / 2, 0, 0]} /></Environment><CameraRig mode={cameraMode} locked={guided} /><SafeMedicalGLB path={MODEL_PATHS.operationTheatre} targetSize={14} preserveMaterials castShadows={false} position={[0,1.66,0]} rotation={[0,Math.PI/2,0]} fallback={<HospitalRoom />} /><SafeMedicalGLB path={MODEL_PATHS.hospitalBed} targetSize={5.35} preserveMaterials position={[0,1.12,0]} fallback={<FallbackHospitalBed />} /><ModelErrorBoundary fallback={legacyPatient}><Suspense fallback={proceduralPatient}><LoadedPatient {...patientProps} /></Suspense></ModelErrorBoundary><FallbackMonitor /><IVStand /><InstrumentTray selectedTool={state.selectedTool} physical={state.trackingOverlay} />{state.trackingOverlay && state.movementMode === "surgical" && <GestureHand mode={cameraMode} />}<SurgicalPhysics active={state.trackingOverlay && state.movementMode === "surgical"} /><ContactShadows frames={1} resolution={192} position={[0, .02, 0]} opacity={.32} scale={15} blur={2.6} far={5} /></Canvas></SceneErrorBoundary>;
 }
 
 function CameraRig({ mode, locked }: { mode: Exclude<CameraMode, "webcam"> | "pov"; locked: boolean }) {
   const controls = useRef<OrbitControlsImpl>(null);
   const transitioning = useRef(true);
   const povDist = useRef(POV_WIDE);
+  const povReach = useRef(0);
   const povCenter = useRef(new THREE.Vector3(...presets.pov.target));
   const { camera } = useThree();
   useEffect(() => { transitioning.current = true; }, [mode]);
@@ -75,20 +75,24 @@ function CameraRig({ mode, locked }: { mode: Exclude<CameraMode, "webcam"> | "po
         for (const h of live) { reach += h.reach; povPinch.add(h.pinchPoint); }
         reach /= live.length;
         povPinch.divideScalar(live.length);
-        const lean = THREE.MathUtils.smoothstep(reach, .1, .95);
+        // Smooth the noisy reach + pinch centre ONCE, then place the target and
+        // camera directly from them. The old code eased povCenter→target→camera
+        // in a cascade, so each stage lagged the previous one and the view
+        // rubber-banded behind the hands. Single-stage easing = smooth, no lag.
+        povReach.current = THREE.MathUtils.lerp(povReach.current, reach, damp(6, delta));
+        const lean = THREE.MathUtils.smoothstep(povReach.current, .1, .95);
         povWantCenter.set(...presets.pov.target).lerp(povPinch, lean * .6);
-        const ease = 1 - Math.pow(.015, delta);
-        povDist.current = THREE.MathUtils.lerp(povDist.current, THREE.MathUtils.lerp(POV_WIDE, POV_NEAR, lean), ease);
-        povCenter.current.lerp(povWantCenter, ease);
-        povDir.copy(camera.position).sub(control.target);
+        povCenter.current.lerp(povWantCenter, damp(7, delta));
+        povDist.current = THREE.MathUtils.lerp(povDist.current, THREE.MathUtils.lerp(POV_WIDE, POV_NEAR, lean), damp(3.5, delta));
+        povDir.copy(camera.position).sub(control.target); // keep the fixed POV viewing angle
         if (povDir.lengthSq() < 1e-6) povDir.set(0, .5, 1);
         povDir.normalize();
-        control.target.lerp(povCenter.current, ease);
-        povTargetPos.copy(control.target).addScaledVector(povDir, povDist.current);
-        camera.position.lerp(povTargetPos, ease);
+        control.target.copy(povCenter.current);
+        camera.position.copy(control.target).addScaledVector(povDir, povDist.current);
       } else { // hold state so re-entry from mouse control is seamless
         povDist.current = camera.position.distanceTo(control.target);
         povCenter.current.copy(control.target);
+        povReach.current = 0;
       }
     }
     control.target.x = THREE.MathUtils.clamp(control.target.x, -3.2, 3.2);
