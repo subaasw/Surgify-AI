@@ -24,9 +24,12 @@ const sub = (a, b) => [a.x - b.x, a.y - b.y, (a.z ?? 0) - (b.z ?? 0)];
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const norm = v => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
 
-// camera space (x right, y down, z toward viewer) → world space
-// (x across the bed — mirrored selfie view, y up, z along the patient)
-const toWorld = v => [-v[0], -v[2], v[1]];
+// camera space (x right, y down, z away from camera) → world space
+// (x across the bed, y up, z along the patient). A proper rotation (det +1),
+// not a reflection — so a right hand stays a right hand: leaning toward the
+// camera reaches down, image-down runs along the patient, and screen side
+// matches your physical side.
+const toWorld = v => [-v[0], v[2], v[1]];
 
 /**
  * Full palm pose from one detected hand.

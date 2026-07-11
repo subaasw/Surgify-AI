@@ -5,6 +5,7 @@ import { createPortal, useFrame, useLoader } from "@react-three/fiber";
 import * as THREE from "three";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { FilesetResolver, GestureRecognizer } from "@mediapipe/tasks-vision";
 import { useSimulation } from "./SimulationProvider";
 import { ModelErrorBoundary, SafeMedicalGLB } from "./ModelRegistry";
 import { MODEL_PATHS } from "@/data/modelConfig";
@@ -17,29 +18,43 @@ export type TrackedHand = {
   pinch: boolean;
   pointer: { x: number; y: number };
   landmarks: Landmark[];
+  side: Side;
 };
 
 type Side = "Left" | "Right";
 
-/** Latest backend detections, written by the driver and read at render rate by useFrame. */
+/** Latest detections, written by the driver and read at render rate by useFrame. */
 export const handStore: { hands: TrackedHand[]; at: number; gripSide: Side | null } = { hands: [], at: 0, gripSide: null };
 
-const API_URL = process.env.NEXT_PUBLIC_SURGIFY_API_URL ?? "http://localhost:8000/api/v1";
-const FRAME_INTERVAL_MS = 160;
-const RELEASE_FRAMES = 4; // sustained open palms before the tool returns to the tray
-const STALE_MS = 1200; // no detection for this long → hand parks by the tray
+const WASM_PATH = "/mediapipe/wasm";
+const MODEL_PATH = "/mediapipe/gesture_recognizer.task";
+const RELEASE_MS = 600; // sustained open palms before the tool returns to the tray
+const STALE_MS = 400; // no detection for this long → hand parks by the tray
+const PINCH_RATIO = .35; // thumb→index tip distance relative to hand size
 
 // Calibration knobs for the rigged arms asset.
 const HAND_LENGTH = .56; // wrist → middle fingertip, world units
 const ARM_SHORTEN = { upper: .35, fore: .55 }; // compress the arm trailing behind the wrist
 const CURL_PER_JOINT = [.8, 1.05, .65]; // radians per knuckle at full curl
-const FLIP_HANDEDNESS = false; // flip if the on-screen hands mirror your real ones
 const PARK: Record<Side, { x: number; y: number; z: number }> = {
   Right: { x: 2.3, y: 2.35, z: 1.5 },
   Left: { x: -2.3, y: 2.35, z: 1.5 },
 };
 
-const sideOfHand = (hand: TrackedHand): Side => (hand.handedness === "Left") !== FLIP_HANDEDNESS ? "Left" : "Right";
+/**
+ * Which surgeon hand a detection drives. Screen position is the ground truth:
+ * the camera faces you, so the hand on the image's left half is your physical
+ * right hand. With two hands present we sort by position, which is immune to
+ * MediaPipe's (noisy, mirror-convention) handedness labels; with one hand we
+ * fall back to the label, inverted because we feed raw un-mirrored frames.
+ */
+function assignSides(hands: Omit<TrackedHand, "side">[]): TrackedHand[] {
+  if (hands.length === 2) {
+    const sorted = [...hands].sort((a, b) => a.landmarks[0].x - b.landmarks[0].x);
+    return [{ ...sorted[0], side: "Right" as const }, { ...sorted[1], side: "Left" as const }];
+  }
+  return hands.map(hand => ({ ...hand, side: hand.handedness === "Left" ? "Right" as const : "Left" as const }));
+}
 
 const HAND_CONNECTIONS = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12], [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [17, 18], [18, 19], [19, 20], [0, 17]] as const;
 const SIDE_COLORS: Record<Side, string> = { Right: "#5fd4de", Left: "#f0c25e" };
@@ -47,8 +62,9 @@ const SIDE_COLORS: Record<Side, string> = { Right: "#5fd4de", Left: "#f0c25e" };
 type TrackingPhase = "starting" | "denied" | "offline" | "active";
 
 /**
- * DOM side of gesture control: streams webcam frames to the backend MediaPipe
- * endpoint, publishes every detected hand into `handStore`, and shows a
+ * DOM side of gesture control: runs MediaPipe gesture recognition directly in
+ * the browser (GPU-accelerated, per video frame — no backend round trip),
+ * publishes every detected hand into `handStore`, and shows a
  * picture-in-picture camera panel with the detected skeletons and gestures
  * drawn live over the video. Render it outside the r3f Canvas.
  */
@@ -64,10 +80,10 @@ export function HandTrackingDriver() {
   useEffect(() => {
     let stopped = false;
     let stream: MediaStream | null = null;
-    let timer = 0;
-    let inFlight = false;
-    let openFrames = 0;
-    const canvas = document.createElement("canvas");
+    let recognizer: GestureRecognizer | null = null;
+    let rafId = 0;
+    let lastVideoTime = -1;
+    let openSince = 0;
 
     const drawOverlay = (hands: TrackedHand[]) => {
       const overlay = overlayRef.current;
@@ -75,7 +91,7 @@ export function HandTrackingDriver() {
       if (!overlay || !context) return;
       context.clearRect(0, 0, overlay.width, overlay.height);
       for (const hand of hands) {
-        const color = SIDE_COLORS[sideOfHand(hand)];
+        const color = SIDE_COLORS[hand.side];
         const px = (i: number) => (1 - hand.landmarks[i].x) * overlay.width; // mirror to match the selfie video
         const py = (i: number) => hand.landmarks[i].y * overlay.height;
         context.strokeStyle = color;
@@ -93,40 +109,36 @@ export function HandTrackingDriver() {
       }
     };
 
-    const tick = async () => {
+    const tick = () => {
+      rafId = requestAnimationFrame(tick);
       const video = videoRef.current;
-      if (stopped || !video || video.readyState < 2 || !video.videoWidth || inFlight) return;
-      inFlight = true;
-      try {
-        canvas.width = 384;
-        canvas.height = Math.round(384 * video.videoHeight / video.videoWidth);
-        canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/jpeg", .72));
-        if (!blob) return;
-        const form = new FormData();
-        form.append("frame", blob, "camera-frame.jpg");
-        form.append("mode", "mediapipe");
-        form.append("timestamp_ms", String(Date.now()));
-        const response = await fetch(`${API_URL}/vision/frame`, { method: "POST", body: form });
-        if (!response.ok || stopped) { setPhase("offline"); return; }
-        const result = await response.json() as { hands?: TrackedHand[] };
-        const hands = (result.hands ?? []).slice(0, 2);
-        handStore.hands = hands;
-        handStore.at = performance.now();
-        const pinching = hands.find(hand => hand.pinch);
-        handStore.gripSide = pinching ? sideOfHand(pinching) : null;
-        setPhase("active");
-        setGesture(hands.length
-          ? hands.map(hand => `${hand.handedness[0]}·${hand.pinch ? "Pinch" : hand.gesture?.replace(/_/g, " ") || "Hand"}`).join("  ")
-          : "No hands");
-        drawOverlay(hands);
-        openFrames = hands.length && hands.every(hand => hand.gesture === "Open_Palm" && !hand.pinch) ? openFrames + 1 : 0;
-        if (openFrames === RELEASE_FRAMES && simRef.current.selectedTool) simRef.current.releaseTool();
-      } catch {
-        if (!stopped) setPhase("offline");
-      } finally {
-        inFlight = false;
-      }
+      if (stopped || !video || !recognizer || video.readyState < 2 || video.currentTime === lastVideoTime) return;
+      lastVideoTime = video.currentTime;
+      const now = performance.now();
+      const result = recognizer.recognizeForVideo(video, now);
+      const hands = assignSides(result.landmarks.slice(0, 2).map((landmarks, i) => {
+        const size = Math.hypot(landmarks[9].x - landmarks[0].x, landmarks[9].y - landmarks[0].y) || 1;
+        const gestureName = result.gestures[i]?.[0]?.categoryName ?? "";
+        return {
+          handedness: result.handedness[i]?.[0]?.categoryName ?? "Right",
+          gesture: gestureName === "None" ? "" : gestureName,
+          pinch: Math.hypot(landmarks[4].x - landmarks[8].x, landmarks[4].y - landmarks[8].y) < size * PINCH_RATIO,
+          pointer: { x: 1 - landmarks[8].x, y: landmarks[8].y },
+          landmarks,
+        };
+      }));
+      handStore.hands = hands;
+      handStore.at = now;
+      const pinching = hands.find(hand => hand.pinch);
+      handStore.gripSide = pinching ? pinching.side : null;
+      setGesture(hands.length
+        ? hands.map(hand => `${hand.side[0]}·${hand.pinch ? "Pinch" : hand.gesture?.replace(/_/g, " ") || "Hand"}`).join("  ")
+        : "No hands");
+      drawOverlay(hands);
+      if (hands.length && hands.every(hand => hand.gesture === "Open_Palm" && !hand.pinch)) {
+        openSince ||= now;
+        if (now - openSince > RELEASE_MS && simRef.current.selectedTool) { simRef.current.releaseTool(); openSince = 0; }
+      } else openSince = 0;
     };
 
     (async () => {
@@ -135,25 +147,40 @@ export function HandTrackingDriver() {
           video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
           audio: false,
         });
+      } catch {
+        if (!stopped) setPhase("denied");
+        return;
+      }
+      try {
+        const fileset = await FilesetResolver.forVisionTasks(WASM_PATH);
+        const options = (delegate: "GPU" | "CPU") => ({
+          baseOptions: { modelAssetPath: MODEL_PATH, delegate },
+          runningMode: "VIDEO" as const,
+          numHands: 2,
+        });
+        recognizer = await GestureRecognizer.createFromOptions(fileset, options("GPU"))
+          .catch(() => GestureRecognizer.createFromOptions(fileset, options("CPU")));
         if (stopped || !videoRef.current) return;
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
-        timer = window.setInterval(tick, FRAME_INTERVAL_MS);
+        setPhase("active");
+        rafId = requestAnimationFrame(tick);
       } catch {
-        if (!stopped) setPhase("denied");
+        if (!stopped) setPhase("offline");
       }
     })();
 
     return () => {
       stopped = true;
-      window.clearInterval(timer);
+      cancelAnimationFrame(rafId);
       stream?.getTracks().forEach(track => track.stop());
+      recognizer?.close();
       handStore.hands = [];
       handStore.gripSide = null;
     };
   }, []);
 
-  const label = phase === "starting" ? "Starting camera…" : phase === "denied" ? "Camera blocked" : phase === "offline" ? "Vision offline — start backend :8000" : "Hand tracking";
+  const label = phase === "starting" ? "Starting camera…" : phase === "denied" ? "Camera blocked" : phase === "offline" ? "Tracking failed to load" : "Hand tracking";
   return <div className={`gesture-pip${phase === "active" ? "" : " offline"}`}>
     <div className="gesture-pip-feed">
       <video ref={videoRef} muted playsInline />
@@ -183,6 +210,8 @@ const vecOf = (root: THREE.Object3D, name: string) => {
 
 const basisQuat = (across: THREE.Vector3, up: THREE.Vector3, forward: THREE.Vector3) =>
   new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(across, up, forward));
+
+const scratchQuat = new THREE.Quaternion(); // reused every frame by the curl loop
 
 /** Both surgeon hands, each independently driven by its detected counterpart. */
 export function GestureHand() {
@@ -259,14 +288,16 @@ function RiggedHand({ side }: { side: Side }) {
     const rotGroup = rot.current;
     if (!group || !rotGroup) return;
     const fresh = performance.now() - handStore.at < STALE_MS;
-    const live = fresh ? handStore.hands.find(hand => sideOfHand(hand) === side) ?? null : null;
+    const live = fresh ? handStore.hands.find(hand => hand.side === side) ?? null : null;
 
     rig.position.copy(pivot);
     const pose = live ? palmPose(live) : { ...park, grip: 0, axes: null };
     const a = axes.current;
-    springStep(a.x, pose.x, delta);
-    springStep(a.y, pose.y, delta);
-    springStep(a.z, pose.z, delta);
+    // stiff springs: tracking is realtime now, so follow tightly and let the
+    // damping kill jitter rather than adding visible lag
+    springStep(a.x, pose.x, delta, 170, 26);
+    springStep(a.y, pose.y, delta, 170, 26);
+    springStep(a.z, pose.z, delta, 170, 26);
     springStep(a.grip, pose.grip, delta, 40, 12);
     group.position.set(a.x.value, Math.max(a.y.value, WORKSPACE.floorY), a.z.value);
 
@@ -276,7 +307,7 @@ function RiggedHand({ side }: { side: Side }) {
         new THREE.Vector3(...pose.axes.up),
         new THREE.Vector3(...pose.axes.forward),
       ).multiply(restQuatInv);
-      rotGroup.quaternion.slerp(target, damp(14, delta));
+      rotGroup.quaternion.slerp(target, damp(20, delta));
     }
 
     const liveCurls = (live ? fingerCurls(live.landmarks) : RELAXED_CURLS) as Record<FingerName, number>;
@@ -285,7 +316,7 @@ function RiggedHand({ side }: { side: Side }) {
       const level = curls.current[finger] += (liveCurls[finger] - curls.current[finger]) * blend;
       for (let j = 0; j < 3; j++) {
         const joint = fingers[finger]?.[j];
-        if (joint) joint.bone.quaternion.copy(joint.rest).multiply(new THREE.Quaternion().setFromAxisAngle(joint.axis, level * CURL_PER_JOINT[j]));
+        if (joint) joint.bone.quaternion.copy(joint.rest).multiply(scratchQuat.setFromAxisAngle(joint.axis, level * CURL_PER_JOINT[j]));
       }
     }
   });

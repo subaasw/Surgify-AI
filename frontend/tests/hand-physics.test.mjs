@@ -40,6 +40,20 @@ test("palm basis is orthonormal and flips when the hand shows its back", () => {
   assert.ok(dot(up, flipped.axes.up) < -.99); // back of hand → palm normal inverts
 });
 
+test("landmark→world map preserves chirality (rotation, not a mirror)", () => {
+  // fingers pointing at the camera (knuckle closer than wrist) must point
+  // DOWN at the patient — the old reflection mapping pointed them up and
+  // mirrored every hand into its opposite
+  const leaning = flatHand();
+  leaning.landmarks[9] = { x: .5, y: .6, z: -.2 };
+  const { axes } = palmPose(leaning);
+  assert.ok(axes.forward[1] < -.9, `expected forward to point down, got ${axes.forward}`);
+  // and the basis stays right-handed: across × up = forward
+  const [a, u, f] = [axes.across, axes.up, axes.forward];
+  const crossAU = [a[1] * u[2] - a[2] * u[1], a[2] * u[0] - a[0] * u[2], a[0] * u[1] - a[1] * u[0]];
+  assert.ok(crossAU[0] * f[0] + crossAU[1] * f[1] + crossAU[2] * f[2] > .99);
+});
+
 test("straight fingers give ~0 curl, folded fingers give high curl", () => {
   const straight = Array.from({ length: 21 }, (_, i) => ({ x: .5, y: .8 - i * .01, z: 0 }));
   const open = fingerCurls(straight);
