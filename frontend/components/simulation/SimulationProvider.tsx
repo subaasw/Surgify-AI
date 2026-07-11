@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import type { CameraMode, CoachMessage, SimulationState } from "@/types/simulation";
+import type { CameraMode, CoachMessage, MovementMode, SimulationState } from "@/types/simulation";
 import { procedureSteps, stitchActions } from "@/data/simulationData";
 import { INCISION_SEGMENTS } from "@/lib/handPhysics.mjs";
 
@@ -24,6 +24,7 @@ const createInitialState = (): SimulationState => ({
   feedback: [{ id: "ready", tone: "info", title: "Case briefing ready", message: "Review the objective and choose an input method to begin.", timestamp: 0 }],
   anatomyOverlay: false,
   trackingOverlay: false, // POV hands off by default
+  movementMode: "normal", // pointer-only until an operative step turns hands on
   events: [],
   uiCollapsed: false,
 
@@ -52,6 +53,7 @@ type SimulationContextValue = {
   setSurfaceContact: (contact: boolean) => void;
   performAction: (action: string) => void;
   setCameraMode: (mode: CameraMode) => void;
+  setMovementMode: (mode: MovementMode) => void;
   setPaused: (paused: boolean) => void;
   setSuturePosition: (position: number) => void;
   setSutureAngle: (angle: number) => void;
@@ -88,6 +90,8 @@ function completeCurrentStep(current: SimulationState, id: string, message: stri
 
   let nextCameraMode = current.cameraMode;
   let nextUiCollapsed = current.uiCollapsed;
+  // operative steps drive the hands; assessment/prep steps are pointer-only
+  const nextMovementMode: MovementMode = nextStep >= 4 && nextStep <= 6 ? "surgical" : "normal";
   if (nextStep === 4) nextCameraMode = "tray";
   if (nextStep >= 5 && nextStep <= 6) {
      nextCameraMode = "closeup";
@@ -98,7 +102,7 @@ function completeCurrentStep(current: SimulationState, id: string, message: stri
      nextUiCollapsed = false;
   }
 
-  return addFeedback({ ...current, completedSteps, currentStep: nextStep, cameraMode: nextCameraMode, uiCollapsed: nextUiCollapsed }, "Objective completed", message, "success");
+  return addFeedback({ ...current, completedSteps, currentStep: nextStep, cameraMode: nextCameraMode, movementMode: nextMovementMode, uiCollapsed: nextUiCollapsed }, "Objective completed", message, "success");
 }
 
 function demoAdvanceStep(current: SimulationState): SimulationState {
@@ -326,6 +330,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     setSurfaceContact: contact => setState(current => current.surfaceContact === contact ? current : { ...current, surfaceContact: contact }),
     performAction,
     setCameraMode: mode => setState(current => ({ ...current, cameraMode: mode })),
+    setMovementMode: mode => setState(current => ({ ...current, movementMode: mode })),
     setPaused: paused => setState(current => current.runStatus === "active" ? { ...current, paused } : current),
     setSuturePosition: position => setState(current => current.suturePosition === position ? current : { ...current, suturePosition: position }),
     setSutureAngle: angle => setState(current => current.sutureAngle === angle ? current : { ...current, sutureAngle: angle }),

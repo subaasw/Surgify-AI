@@ -1,5 +1,9 @@
 export type CameraMode = "room" | "patient" | "closeup" | "webcam" | "anatomy" | "tray" | "incision";
 
+// surgical: 3D hands drive physics — grab instruments, collide with surfaces.
+// normal: hands hidden, only the screen pointer is live; nothing collides.
+export type MovementMode = "surgical" | "normal";
+
 export type PatientVitals = {
   heartRate: number;
   systolic: number;
@@ -44,6 +48,7 @@ export type SimulationState = {
   feedback: CoachMessage[];
   anatomyOverlay: boolean;
   trackingOverlay: boolean;
+  movementMode: MovementMode;
   events: SimulationEvent[];
   uiCollapsed: boolean;
 
