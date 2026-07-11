@@ -62,8 +62,8 @@ export const handStore: {
 const WASM_PATH = "/mediapipe/wasm";
 const MODEL_PATH = "/mediapipe/gesture_recognizer.task";
 const STALE_MS = 400; // no detection for this long → hand fades out
-const PINCH_PRESS_RATIO = .32;
-const PINCH_RELEASE_RATIO = .42;
+const PINCH_PRESS_RATIO = .38; // easier to trigger a grab…
+const PINCH_RELEASE_RATIO = .5; // …with hysteresis so it doesn't flicker back open
 const HAND_LENGTH = .62; // wrist → middle fingertip, world units
 const CALIBRATION_FRAMES = 40;
 const FILTER_CUTOFF = 1.2;
@@ -109,7 +109,7 @@ function surfaceUnder(x: number, z: number) {
   if (collisionMeshes.length) {
     rayFrom.set(x, 5, z);
     surfaceRay.set(rayFrom, RAY_DOWN);
-    const hit = surfaceRay.intersectObjects(collisionMeshes, true)[0];
+    const hit = surfaceRay.intersectObjects(collisionMeshes, true).find(h => (h.object as THREE.Mesh).isMesh);
     if (hit) y = Math.max(y, hit.point.y);
   }
   return y;
@@ -136,7 +136,7 @@ function setRangeFromPointer(input: HTMLInputElement, clientX: number) {
 
 
 export function HandTrackingDriver() {
-  const { state, setCameraMode, toggleAnatomy } = useSimulation();
+  const { state, setCameraMode, setMovementMode, toggleAnatomy } = useSimulation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
@@ -151,7 +151,11 @@ export function HandTrackingDriver() {
   const [menuHighlight, setMenuHighlight] = useState(-1);
   const menuOpenRef = useRef(false);
   useEffect(() => { menuOpenRef.current = menuOpen; interactionState.menuOpen = menuOpen; }, [menuOpen]);
-  useEffect(() => { interactionState.surgeryActive = state.currentStep >= 4; return () => { interactionState.surgeryActive = false; }; }, [state.currentStep]);
+  useEffect(() => { interactionState.surgeryActive = state.movementMode === "surgical"; return () => { interactionState.surgeryActive = false; }; }, [state.movementMode]);
+  // Two-hand double-tap flips surgical⇄normal without touching the mouse — the
+  // surgical pointer is suppressed, so a gesture is the only hands-free way back.
+  const toggleMovementRef = useRef<() => void>(() => {});
+  useEffect(() => { toggleMovementRef.current = () => setMovementMode(state.movementMode === "surgical" ? "normal" : "surgical"); }, [setMovementMode, state.movementMode]);
   const commitRef = useRef<(i: number) => void>(() => {});
   useEffect(() => { commitRef.current = (i: number) => {
       const item = HAND_MENU[i];
@@ -180,6 +184,8 @@ export function HandTrackingDriver() {
     let cursorAnchor = { x: 0, y: 0 };
     let publishedTarget = "";
     let lastMotionAt = 0;
+    let bothPinchWas = false;   // were both hands pinching last frame
+    let lastBothTapAt = 0;      // time of the first tap of a pending double-tap
     const menuPinchWas: Record<Side, boolean> = { Left: false, Right: false };
     const menuRise: Record<Side, number> = { Left: 0, Right: 0 }; // last pinch rise per hand
     let menuHand: Side | null = null; // hand that opened the wheel — also aims it
@@ -330,12 +336,14 @@ export function HandTrackingDriver() {
         const raw = hand.rawGesture === "None" ? "" : hand.rawGesture;
         const gestureName = raw || classifyPose(landmarks, world);
         const size = Math.hypot(landmarks[9].x - landmarks[0].x, landmarks[9].y - landmarks[0].y) || 1;
-        // thumbs-up/fist also put the thumb tip near the index tip — the
-        // distance test alone misread them as a pinch and masked the gesture
-        const pinchable = !["Thumb_Up", "Thumb_Down", "Closed_Fist"].includes(gestureName);
+        // Only thumbs-up/down are excluded (they park the thumb near the index
+        // and would read as a false pinch). A closed fist now counts as a pinch:
+        // "close your hand to grab" is exactly the intended grab gesture.
+        const pinchable = !["Thumb_Up", "Thumb_Down"].includes(gestureName);
         const ratio = Math.hypot(landmarks[4].x - landmarks[8].x, landmarks[4].y - landmarks[8].y) / size;
-        const pinching = pinchable && ratio < (gesturePinch[hand.side].active ? PINCH_RELEASE_RATIO : PINCH_PRESS_RATIO);
-        gesturePinch[hand.side] = stablePinch(gesturePinch[hand.side], pinching, 3).state;
+        const pinching = pinchable && (gestureName === "Closed_Fist"
+          || ratio < (gesturePinch[hand.side].active ? PINCH_RELEASE_RATIO : PINCH_PRESS_RATIO));
+        gesturePinch[hand.side] = stablePinch(gesturePinch[hand.side], pinching, 2).state;
         return {
           handedness: hand.handedness,
           gesture: gestureName,
@@ -367,8 +375,19 @@ export function HandTrackingDriver() {
       handStore.hands = hands;
       handStore.at = now;
 
+      // Two-hand double-tap toggles surgical⇄normal. A simultaneous two-hand
+      // pinch is a distinct, deliberate act (held tools are a sustained pinch,
+      // not a tap), so this won't fire while operating. Runs in both modes.
+      const bothPinch = hands.length === 2 && hands.every(hand => hand.pinch)
+        && !handWorld.Left.holding && !handWorld.Right.holding; // grabbing tools ≠ mode gesture
+      if (bothPinch && !bothPinchWas) {
+        if (now - lastBothTapAt < 550) { toggleMovementRef.current(); lastBothTapAt = 0; }
+        else lastBothTapAt = now;
+      }
+      bothPinchWas = bothPinch;
+
       for (const hand of interactionState.surgeryActive ? [] : hands) {
-        if (hand.pinch && !menuPinchWas[hand.side]) {
+        if (!bothPinch && hand.pinch && !menuPinchWas[hand.side]) { // two-hand taps are the mode gesture, not the menu
           if (now - menuRise[hand.side] < 450) { // double-tap on this hand
             if (menuOpenRef.current) { setMenuOpen(false); menuAnchor = null; menuHand = null; }
             else {
@@ -482,8 +501,8 @@ export function HandTrackingDriver() {
         <canvas ref={overlayRef} width={640} height={480} />
         <div className="gesture-camera-live"><i /><span>{label}</span></div>
         <div className="gesture-camera-hud">
-          <small>Stage {state.currentStep + 1} · {objective.title}</small>
-          <strong>{phase === "active" ? menuOpen ? "Aim a mode · pinch or rest to pick" : targetLabel ? `Right pinch · ${targetLabel}` : "Left pinch moves · Right pinch selects · double-pinch = wheel" : label}</strong>
+          <small>Stage {state.currentStep + 1} · {objective.title}{active ? ` · ${state.movementMode === "surgical" ? "🖐 Surgical" : "👆 Pointer"} mode` : ""}</small>
+          <strong>{phase === "active" ? state.movementMode === "surgical" ? "Hover a tool (green ring) · pinch to grab · both-hands double-tap = Pointer mode" : menuOpen ? "Aim a mode · pinch or rest to pick" : targetLabel ? `Right pinch · ${targetLabel}` : "Left pinch moves · double-pinch = wheel · both-hands double-tap = Surgical mode" : label}</strong>
           {active && <span>{gesture}</span>}
         </div>
       </div>
@@ -714,6 +733,7 @@ function RiggedHand({ side, mode }: { side: Side; mode: Exclude<CameraMode, "web
     // whatever solid surface is under them — the real patient mesh (raycast) or bed/tray/floor.
     let lift = mode === "tray" ? 0 : hw.contactLift;
     hw.contactLift = 0;
+    surfaceRay.camera = camera; // Line2/Points children need a camera on the ray or their raycast throws on `.near`
     if (mode !== "tray") for (const point of contactTips) {
         point.getWorldPosition(contactPoint);
         lift = Math.max(lift, surfaceUnder(contactPoint.x, contactPoint.z) - contactPoint.y);
