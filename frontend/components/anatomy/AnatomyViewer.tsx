@@ -1,12 +1,12 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
-import { Canvas } from "@react-three/fiber";
-import { Environment, Float, Html, OrbitControls } from "@react-three/drei";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
+import { ContactShadows, Environment, Html, OrbitControls } from "@react-three/drei";
 import { Eye, EyeOff, Focus, Layers3, RotateCcw, ScanLine } from "lucide-react";
+import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { anatomyLayers } from "@/data/mockData";
 import type { AnatomyLayer } from "@/types";
-import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { SceneErrorBoundary } from "./SceneErrorBoundary";
 import { SafeMedicalFBX, SafeMedicalGLB } from "@/components/simulation/ModelRegistry";
@@ -14,9 +14,19 @@ import { MODEL_PATHS } from "@/data/modelConfig";
 
 type LayerState = Record<AnatomyLayer["id"], boolean>;
 
+const emptyLayers: LayerState = { skin: false, muscles: false, skeleton: false, brain: false, heart: false, lungs: false, kidney: false, liver: false, stomach: false };
+const layerRegion: Record<AnatomyLayer["id"], string> = { skin: "Whole body", muscles: "Whole body", skeleton: "Thorax", brain: "Head", heart: "Thorax", lungs: "Thorax", kidney: "Abdomen", liver: "Abdomen", stomach: "Abdomen" };
+const regionLayer: Record<string, AnatomyLayer["id"]> = { "Whole body": "skin", Head: "brain", Thorax: "heart", Abdomen: "liver" };
+const layerGroups = [
+  { label: "Body layers", ids: ["skin", "muscles", "skeleton"] as AnatomyLayer["id"][] },
+  { label: "Internal organs", ids: ["brain", "heart", "lungs", "kidney", "liver", "stomach"] as AnatomyLayer["id"][] },
+];
+
+const systemFor = (id: AnatomyLayer["id"]) => id === "heart" ? "Cardiovascular" : id === "lungs" ? "Respiratory" : id === "brain" ? "Nervous" : id === "kidney" ? "Urinary" : id === "skeleton" ? "Skeletal" : id === "muscles" ? "Muscular" : id === "skin" ? "Integumentary" : "Digestive";
+
 export function AnatomyViewer() {
-  const [visible, setVisible] = useState<LayerState>({ skin: true, muscles: true, skeleton: true, brain: true, heart: true, lungs: true, kidney: true, liver: true, stomach: true });
-  const [selected, setSelected] = useState<AnatomyLayer["id"]>("skin");
+  const [visible, setVisible] = useState<LayerState>({ ...emptyLayers, skin: true, heart: true });
+  const [selected, setSelected] = useState<AnatomyLayer["id"]>("heart");
   const [exploded, setExploded] = useState(0);
   const [wireframe, setWireframe] = useState(false);
   const [transparent, setTransparent] = useState(true);
@@ -25,6 +35,12 @@ export function AnatomyViewer() {
   const [cameraKey, setCameraKey] = useState(0);
   const selectedLayer = anatomyLayers.find(layer => layer.id === selected)!;
   const toggleLayer = (id: AnatomyLayer["id"]) => setVisible(v => ({ ...v, [id]: !v[id] }));
+  const focusLayer = (id: AnatomyLayer["id"]) => {
+    setSelected(id);
+    setRegion(layerRegion[id]);
+    setVisible({ ...emptyLayers, skin: id !== "skin", [id]: true });
+  };
+  const focusRegion = (nextRegion: string) => focusLayer(regionLayer[nextRegion]);
 
   return (
     <div className="anatomy-layout">
@@ -39,10 +55,10 @@ export function AnatomyViewer() {
         </div>
 
         <div className="body-regions" role="group" aria-label="Body region">
-          {["Head", "Thorax", "Abdomen", "Upper limb", "Lower limb"].map(item => (
+          {["Whole body", "Head", "Thorax", "Abdomen"].map(item => (
             <button
               key={item}
-              onClick={() => setRegion(item)}
+              onClick={() => focusRegion(item)}
               className={region === item ? "active" : ""}
             >
               {item}
@@ -50,29 +66,7 @@ export function AnatomyViewer() {
           ))}
         </div>
 
-        <div className="layer-list">
-          {anatomyLayers.map(layer => (
-            <div key={layer.id} className={cn("layer-row", selected === layer.id && "selected")}>
-              <button
-                className="layer-main"
-                onClick={() => { setSelected(layer.id); if (!visible[layer.id]) toggleLayer(layer.id); }}
-              >
-                <i style={{ background: layer.color }} />
-                <span>
-                  <strong>{layer.name}</strong>
-                  <small>{layer.id === "skin" || layer.id === "muscles" || layer.id === "skeleton" ? "Tissue layer" : "Internal structure"}</small>
-                </span>
-              </button>
-              <button
-                className="layer-visibility"
-                onClick={() => toggleLayer(layer.id)}
-                aria-label={`${visible[layer.id] ? "Hide" : "Show"} ${layer.name}`}
-              >
-                {visible[layer.id] ? <Eye size={14} /> : <EyeOff size={14} />}
-              </button>
-            </div>
-          ))}
-        </div>
+        <div className="layer-list">{layerGroups.map(group => <section className="layer-group" key={group.label}><p>{group.label}</p>{group.ids.map(id => { const layer = anatomyLayers.find(item => item.id === id)!; return <div key={layer.id} className={cn("layer-row", selected === layer.id && "selected")}><button className="layer-main" onClick={() => focusLayer(layer.id)}><i style={{ background: layer.color }} /><span><strong>{layer.name}</strong><small>{layerRegion[layer.id]}</small></span></button><button className="layer-visibility" onClick={() => toggleLayer(layer.id)} aria-label={`${visible[layer.id] ? "Hide" : "Show"} ${layer.name}`}>{visible[layer.id] ? <Eye size={15} /> : <EyeOff size={15} />}</button></div>; })}</section>)}</div>
 
         <div className="exploded-control">
           <div>
@@ -115,19 +109,18 @@ export function AnatomyViewer() {
 
         <div className="anatomy-canvas">
           <SceneErrorBoundary>
-            <Canvas camera={{ position: [0, 0.15, 6.4], fov: 40 }} dpr={[1, 1.6]}>
-              <color attach="background" args={["#eaf3f8"]} />
-              <fog attach="fog" args={["#eaf3f8", 7, 13]} />
-              <ambientLight intensity={1.15} />
-              <directionalLight position={[4, 6, 5]} intensity={2.4} color="#d9f8ff" />
-              <directionalLight position={[-4, -2, 3]} intensity={1.2} color="#2979c7" />
+            <Canvas camera={{ position: [0, .45, 3.7], fov: 38 }} dpr={[1, 1.6]}>
+              <color attach="background" args={["#eef5f8"]} />
+              <fog attach="fog" args={["#eef5f8", 7, 13]} />
+              <ambientLight intensity={1.35} />
+              <directionalLight position={[4, 6, 5]} intensity={2.3} color="#ffffff" />
+              <directionalLight position={[-4, 1, 3]} intensity={.65} color="#8fbfe0" />
               <Suspense fallback={<Html center><span className="canvas-loader">Loading anatomy…</span></Html>}>
-                <Float speed={.65} rotationIntensity={.05} floatIntensity={.08}>
-                  <ProceduralTorso visible={visible} selected={selected} exploded={exploded} wireframe={wireframe} transparent={transparent} labels={labels} onSelect={setSelected} />
-                </Float>
+                <ProceduralTorso visible={visible} selected={selected} exploded={exploded} wireframe={wireframe} transparent={transparent} labels={labels} onSelect={focusLayer} />
                 <Environment preset="city" environmentIntensity={.35} />
               </Suspense>
-              <OrbitControls key={cameraKey} enablePan={false} minDistance={3.8} maxDistance={9} minPolarAngle={.4} maxPolarAngle={2.7} />
+              <ContactShadows position={[0,-2.15,0]} opacity={.18} scale={6} blur={2.4} far={5} />
+              <AnatomyCamera region={region} revision={cameraKey} />
             </Canvas>
           </SceneErrorBoundary>
         </div>
@@ -143,39 +136,28 @@ export function AnatomyViewer() {
 
       {/* ── Right sidebar: structure details ── */}
       <aside className="structure-info panel">
-        <div className="structure-color" style={{ background: `linear-gradient(135deg, ${selectedLayer.color}33, transparent)` }}>
-          <span style={{ background: selectedLayer.color }} />
-          <BadgeLabel text="Selected structure" />
-        </div>
-
-        <p className="eyebrow">Structure overview</p>
-        <h2>{selectedLayer.name}</h2>
-        <p>{selectedLayer.description}</p>
-
-        <div className="structure-facts">
-            <div>
-              <span>Region</span>
-              <strong>{selected === "brain" ? "Head" : ["skin","muscles","skeleton","heart","lungs"].includes(selected) ? "Thorax" : "Abdomen"}</strong>
-            </div>
-            <div>
-              <span>System</span>
-              <strong>{selected === "heart" ? "Cardiovascular" : selected === "lungs" ? "Respiratory" : selected === "brain" ? "Nervous" : selected === "kidney" ? "Urinary" : selected === "skeleton" ? "Skeletal" : selected === "muscles" ? "Muscular" : selected === "skin" ? "Integumentary" : "Digestive"}</strong>
-            </div>
-          </div>
-
-          <div className="training-relevance">
-            <span><Focus size={14} />Training relevance</span>
-            <p>{selectedLayer.relevance}</p>
-          </div>
-
-        <Button variant="secondary" onClick={() => setSelected(selected === "skin" ? "heart" : "skin")}>Highlight related structure</Button>
+        <div className="structure-heading"><span style={{ background: selectedLayer.color }} /><div><p className="eyebrow">Selected structure</p><h2>{selectedLayer.name}</h2></div><button onClick={() => toggleLayer(selected)} aria-label={`${visible[selected] ? "Hide" : "Show"} ${selectedLayer.name}`}>{visible[selected] ? <Eye size={16} /> : <EyeOff size={16} />}</button></div>
+        <div className="structure-facts"><div><span>Region</span><strong>{layerRegion[selected]}</strong></div><div><span>System</span><strong>{systemFor(selected)}</strong></div></div>
+        <section className="structure-copy"><span>What you&apos;re seeing</span><p>{selectedLayer.description}</p></section>
+        <div className="training-relevance"><span><Focus size={14} />Procedure relevance</span><p>{selectedLayer.relevance}</p></div>
+        <button className="focus-structure" onClick={() => setCameraKey(key => key + 1)}><Focus size={14} />Refocus selected region</button>
         <p className="education-note">Educational visualization only. Not intended for diagnosis or real-patient procedure planning.</p>
       </aside>
     </div>
   );
 }
 
-function BadgeLabel({ text }: { text: string }) { return <small>{text}</small>; }
+function AnatomyCamera({ region, revision }: { region: string; revision: number }) {
+  const controls = useRef<OrbitControlsImpl>(null);
+  const { camera } = useThree();
+  useEffect(() => {
+    const preset = region === "Head" ? { position: [0, 1.65, 3.1], target: [0, 1.55, 0] } : region === "Abdomen" ? { position: [0, -.45, 3.25], target: [0, -.48, .1] } : region === "Whole body" ? { position: [0, .05, 6.2], target: [0, 0, 0] } : { position: [0, .45, 3.55], target: [0, .45, .1] };
+    camera.position.set(...preset.position);
+    controls.current?.target.set(...preset.target);
+    controls.current?.update();
+  }, [camera, region, revision]);
+  return <OrbitControls ref={controls} enablePan={false} minDistance={2.4} maxDistance={7} minPolarAngle={.5} maxPolarAngle={2.55} />;
+}
 
 function MaterialProps({ id, selected, wireframe, transparent, color }: { id: AnatomyLayer["id"]; selected: AnatomyLayer["id"]; wireframe: boolean; transparent: boolean; color: string }) {
   const dim = selected !== id;
@@ -205,8 +187,8 @@ function ProceduralTorso({ visible, selected, exploded, wireframe, transparent, 
   const common = { selected, wireframe, transparent };
   return (
     <group scale={1.12} position={[0, -.1, 0]}>
-      {visible.skin && <group onClick={(e) => { e.stopPropagation(); onSelect("skin"); }} position={[0,-.05,spread*.38]}><SafeMedicalFBX path={MODEL_PATHS.alternatePatient} targetSize={4.35} preserveTextures color="#c9937d" roughness={.72} opacity={transparent ? (selected === "skin" ? .28 : .12) : (selected === "skin" ? .82 : .34)} wireframe={wireframe} fallback={<FallbackSkinLayer common={common} />} /><Label position={[1.35,1.1,.4]} show={labels && selected === "skin"}>Skin layer</Label></group>}
-      {visible.muscles && <group onClick={(e) => { e.stopPropagation(); onSelect("muscles"); }} position={[-spread*.95,0,.05]}><mesh scale={[1.05,1.45,.58]}><capsuleGeometry args={[.64,1.3,10,20]} /><MaterialProps id="muscles" color="#a94350" {...common} /></mesh>{[-.55,-.18,.18,.55].map(x => <mesh key={x} position={[x,.35,.56]} scale={[.2,.8,.12]}><capsuleGeometry args={[.16,.65,6,12]} /><MaterialProps id="muscles" color="#c65660" {...common} /></mesh>)}<Label position={[-1.25,.85,.35]} show={labels && selected === "muscles"}>Muscle fibres</Label></group>}
+      {visible.skin && <group onClick={(e) => { e.stopPropagation(); onSelect("skin"); }} position={[0,-.05,spread*.38]}><SafeMedicalFBX path={MODEL_PATHS.alternatePatient} targetSize={4.35} preserveTextures={false} color="#d1a086" roughness={.78} opacity={transparent ? (selected === "skin" ? .72 : .1) : (selected === "skin" ? .9 : .3)} wireframe={wireframe} fallback={<FallbackSkinLayer common={common} />} /><Label position={[1.35,1.1,.4]} show={labels && selected === "skin"}>Skin layer</Label></group>}
+      {visible.muscles && <group onClick={(e) => { e.stopPropagation(); onSelect("muscles"); }} position={[-spread*.95,0,.05]}><mesh scale={[.76,1.22,.46]}><capsuleGeometry args={[.64,1.3,10,20]} /><MaterialProps id="muscles" color="#a94350" {...common} /></mesh>{[-.42,-.14,.14,.42].map(x => <mesh key={x} position={[x,.35,.48]} scale={[.15,.68,.1]}><capsuleGeometry args={[.16,.65,6,12]} /><MaterialProps id="muscles" color="#c65660" {...common} /></mesh>)}<Label position={[-1.05,.75,.35]} show={labels && selected === "muscles"}>Muscle layer</Label></group>}
       {
   visible.skeleton && (
     <group
@@ -214,14 +196,14 @@ function ProceduralTorso({ visible, selected, exploded, wireframe, transparent, 
         e.stopPropagation();
         onSelect("skeleton");
       }}
-      position={[spread * 1.25, 0.5, 0.08]}
+      position={[spread * 1.25, 0.45, 0.08]}
       rotation={[0, Math.PI * 1.5, 0]} // 270°
       scale={0.75}
     >
       <group rotation={[0, 0, Math.PI / 2]}>
         <SafeMedicalGLB
           path={MODEL_PATHS.ribCage}
-          targetSize={1.85}
+          targetSize={1.55}
           color="#e9e1ca"
           metalness={0.02}
           roughness={0.64}
@@ -250,12 +232,11 @@ function ProceduralTorso({ visible, selected, exploded, wireframe, transparent, 
   )
 }
       {visible.brain && <group onClick={(e) => { e.stopPropagation(); onSelect("brain"); }} position={[-spread*.75,1.72,spread*.8]}><group rotation={[0,0,Math.PI/2]}><SafeMedicalGLB path={MODEL_PATHS.brain} targetSize={.82} color="#d9a6a6" metalness={0} roughness={.76} preserveTextures={false} opacity={AssetOpacity({id:"brain",selected,transparent})} rotation={[0,Math.PI/2,0]} fallback={<mesh scale={[.48,.38,.45]}><sphereGeometry args={[1,24,18]} /><MaterialProps id="brain" color="#d9a6a6" {...common} /></mesh>} /></group><Label position={[.7,.2,.25]} show={labels && selected === "brain"}>Brain</Label></group>}
-      {visible.heart && <group onClick={(e) => { e.stopPropagation(); onSelect("heart"); }} position={[spread*.25,.43,spread*1.4+.48]} rotation={[0,0,-.08]}><SafeMedicalGLB path={MODEL_PATHS.heart} targetSize={.95} preserveTextures opacity={AssetOpacity({id:"heart",selected,transparent})} fallback={<FallbackHeart common={common} />} /><Label position={[.78,.25,.25]} show={labels && selected === "heart"}>Heart</Label></group>}
-      {visible.lungs && <group onClick={(e) => { e.stopPropagation(); onSelect("lungs"); }} position={[-spread*.35,.55,spread*1.1+.35]}><SafeMedicalGLB path={MODEL_PATHS.lungs} targetSize={1.65} color="#e58f9b" metalness={0} roughness={.72} preserveTextures={false} opacity={AssetOpacity({id:"lungs",selected,transparent})} fallback={<FallbackLungs common={common} />} /><Label position={[-1.05,.3,.2]} show={labels && selected === "lungs"}>Lungs</Label></group>}
-      {visible.kidney && <group onClick={(e) => { e.stopPropagation(); onSelect("kidney"); }} position={[spread*.8,-.62,spread*.95+.32]}><SafeMedicalGLB path={MODEL_PATHS.kidney} targetSize={.62} color="#984d46" metalness={0} roughness={.7} preserveTextures={false} opacity={AssetOpacity({id:"kidney",selected,transparent})} position={[-.42,0,0]} rotation={[0,.45,-.12]} fallback={<mesh scale={[.28,.42,.2]}><sphereGeometry args={[1,20,16]} /><MaterialProps id="kidney" color="#984d46" {...common} /></mesh>} /><SafeMedicalGLB path={MODEL_PATHS.kidney} targetSize={.62} color="#984d46" metalness={0} roughness={.7} preserveTextures={false} opacity={AssetOpacity({id:"kidney",selected,transparent})} position={[.42,0,0]} rotation={[0,-.45,.12]} fallback={<mesh position={[.42,0,0]} scale={[.28,.42,.2]}><sphereGeometry args={[1,20,16]} /><MaterialProps id="kidney" color="#984d46" {...common} /></mesh>} /><Label position={[.95,.1,.2]} show={labels && selected === "kidney"}>Kidneys</Label></group>}
-      {visible.liver && <group onClick={(e) => { e.stopPropagation(); onSelect("liver"); }} position={[spread*1.3,-spread*.35,spread*.7]}><mesh position={[-.25,-.62,.38]} scale={[.72,.35,.42]} rotation={[0,0,-.1]}><sphereGeometry args={[1,24,16]} /><MaterialProps id="liver" color="#7f352f" {...common} /></mesh><Label position={[.65,-.55,.5]} show={labels && selected === "liver"}>Liver</Label></group>}
-      {visible.stomach && <group onClick={(e) => { e.stopPropagation(); onSelect("stomach"); }} position={[-spread*1.25,-spread*.55,spread*.65]}><mesh position={[.35,-.85,.43]} rotation={[0,0,.4]} scale={[.4,.65,.32]}><sphereGeometry args={[1,24,16]} /><MaterialProps id="stomach" color="#c48674" {...common} /></mesh><Label position={[-.55,-.92,.5]} show={labels && selected === "stomach"}>Stomach</Label></group>}
-      <mesh position={[0,-1.45,.72]} rotation={[0,0,.04]}><torusGeometry args={[.52,.018,6,64,Math.PI*.72]} /><meshBasicMaterial color="#4ee2ec" transparent opacity={.75} /></mesh>
+      {visible.heart && <group onClick={(e) => { e.stopPropagation(); onSelect("heart"); }} position={[-.14+spread*.25,.52,spread*1.4+.34]} rotation={[0,0,-.08]}><SafeMedicalGLB path={MODEL_PATHS.heart} targetSize={.62} preserveTextures opacity={AssetOpacity({id:"heart",selected,transparent})} fallback={<FallbackHeart common={common} />} /><Label position={[.56,.18,.2]} show={labels && selected === "heart"}>Heart</Label></group>}
+      {visible.lungs && <group onClick={(e) => { e.stopPropagation(); onSelect("lungs"); }} position={[-spread*.35,.58,spread*1.1+.24]}><SafeMedicalGLB path={MODEL_PATHS.lungs} targetSize={1.28} color="#e58f9b" metalness={0} roughness={.72} preserveTextures={false} opacity={AssetOpacity({id:"lungs",selected,transparent})} fallback={<FallbackLungs common={common} />} /><Label position={[-.86,.25,.2]} show={labels && selected === "lungs"}>Lungs</Label></group>}
+      {visible.kidney && <group onClick={(e) => { e.stopPropagation(); onSelect("kidney"); }} position={[spread*.8,-.34,spread*.95+.18]}><SafeMedicalGLB path={MODEL_PATHS.kidney} targetSize={.44} color="#984d46" metalness={0} roughness={.7} preserveTextures={false} opacity={AssetOpacity({id:"kidney",selected,transparent})} position={[-.34,0,0]} rotation={[0,.45,-.12]} fallback={<mesh position={[-.34,0,0]} scale={[.22,.32,.16]}><sphereGeometry args={[1,20,16]} /><MaterialProps id="kidney" color="#984d46" {...common} /></mesh>} /><SafeMedicalGLB path={MODEL_PATHS.kidney} targetSize={.44} color="#984d46" metalness={0} roughness={.7} preserveTextures={false} opacity={AssetOpacity({id:"kidney",selected,transparent})} position={[.34,0,0]} rotation={[0,-.45,.12]} fallback={<mesh position={[.34,0,0]} scale={[.22,.32,.16]}><sphereGeometry args={[1,20,16]} /><MaterialProps id="kidney" color="#984d46" {...common} /></mesh>} /><Label position={[.72,.08,.2]} show={labels && selected === "kidney"}>Kidneys</Label></group>}
+      {visible.liver && <group onClick={(e) => { e.stopPropagation(); onSelect("liver"); }} position={[spread*1.3,-spread*.35,spread*.7]}><mesh position={[-.28,-.42,.3]} scale={[.55,.25,.32]} rotation={[0,0,-.1]}><sphereGeometry args={[1,24,16]} /><MaterialProps id="liver" color="#7f352f" {...common} /></mesh><Label position={[.5,-.38,.42]} show={labels && selected === "liver"}>Liver</Label></group>}
+      {visible.stomach && <group onClick={(e) => { e.stopPropagation(); onSelect("stomach"); }} position={[-spread*1.25,-spread*.55,spread*.65]}><mesh position={[.28,-.58,.32]} rotation={[0,0,.4]} scale={[.3,.44,.24]}><sphereGeometry args={[1,24,16]} /><MaterialProps id="stomach" color="#c48674" {...common} /></mesh><Label position={[-.45,-.62,.42]} show={labels && selected === "stomach"}>Stomach</Label></group>}
     </group>
   );
 }

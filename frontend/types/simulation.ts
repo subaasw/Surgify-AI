@@ -17,7 +17,17 @@ export type CoachMessage = {
   timestamp: number;
 };
 
+export type SimulationEvent = {
+  id: string;
+  timestamp: number;
+  tone: CoachMessage["tone"];
+  label: string;
+};
+
+export type SimulationRunStatus = "ready" | "active" | "complete";
+
 export type SimulationState = {
+  runStatus: SimulationRunStatus;
   selectedRegion: string | null;
   selectedTool: string | null;
   currentStep: number;
@@ -32,4 +42,7 @@ export type SimulationState = {
   anatomyOverlay: boolean;
   trackingOverlay: boolean;
   stitchPhase: number;
+  suturePosition: number;
+  sutureAngle: number;
+  events: SimulationEvent[];
 };

@@ -17,3 +17,16 @@ test("server-renders the immersive simulation shell", async () => {
   assert.match(html, /AI Coach/);
   assert.doesNotMatch(html, /No headset required|How it works|Launch Prototype/);
 });
+
+test("renders an honest launcher and an empty debrief before training", async () => {
+  const launcher = await render("/scenarios");
+  assert.equal(launcher.status, 200);
+  const launcherHtml = await launcher.text();
+  assert.match(launcherHtml, /Scenario library/);
+  assert.match(launcherHtml, /Start simulation/);
+  assert.match(launcherHtml, /Coming soon/);
+
+  const results = await render("/results");
+  assert.equal(results.status, 200);
+  assert.match(await results.text(), /No completed simulation yet/);
+});

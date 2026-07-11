@@ -51,7 +51,7 @@ export function WebcamPractice() {
   const [result, setResult] = useState<VisionResult | null>(null);
   const [error, setError] = useState("");
   const [latency, setLatency] = useState(0);
-  const { state, setCameraMode, selectRegion, selectTool, releaseTool, performAction } = useSimulation();
+  const { state, setCameraMode, selectRegion, selectTool, releaseTool } = useSimulation();
 
   const stopCamera = useCallback(() => {
     if (loopRef.current !== null) cancelAnimationFrame(loopRef.current);
@@ -170,29 +170,6 @@ export function WebcamPractice() {
       .sort((a, b) => a.distance - b.distance)[0];
   }, [pointer]);
 
-  const advanceScenario = useCallback(() => {
-    const done = state.completedSteps;
-    const actions = state.completedActions;
-    if (!done.includes("review")) return performAction("Review patient information");
-    if (!done.includes("identify")) return selectRegion("Right arm");
-    if (!done.includes("assess")) {
-      if (!actions.includes("Check pulse")) return performAction("Check pulse");
-      if (!actions.includes("Check sensation")) return performAction("Check sensation");
-      return performAction("Check movement");
-    }
-    if (!done.includes("prepare")) {
-      if (!actions.includes("Gloves")) return performAction("Gloves");
-      if (!actions.includes("Antiseptic")) return performAction("Antiseptic");
-      return performAction("Sterile drape");
-    }
-    if (!done.includes("instruments") || !state.selectedTool) return selectTool("Needle holder");
-    if (!done.includes("suture")) {
-      const steps = ["Position instrument", "Match angle", "Begin stitch", "Pull suture", "Tie knot", "Cut suture"];
-      return performAction(steps[Math.min(state.stitchPhase, steps.length - 1)]);
-    }
-    if (!done.includes("complete")) return performAction("Finish procedure");
-  }, [state, performAction, selectRegion, selectTool]);
-
   useEffect(() => {
     if (!hand || result!.tracking_confidence < .5 || status !== "active") {
       gestureLatchRef.current = { key: "", frames: 0 };
@@ -214,15 +191,12 @@ export function WebcamPractice() {
     } else if (gesture === "Open_Palm" && state.selectedTool) {
       releaseTool();
       acted = true;
-    } else if (gesture === "Thumb_Up" || gesture === "Closed_Fist") {
-      advanceScenario();
-      acted = true;
     }
     if (acted) {
       lastActionAtRef.current = Date.now();
       gestureLatchRef.current.frames = 0;
     }
-  }, [hand, nearestTool, pointer, result, status, state.selectedTool, selectTool, selectRegion, releaseTool, advanceScenario]);
+  }, [hand, nearestTool, pointer, result, status, state.selectedTool, selectTool, selectRegion, releaseTool]);
 
   const gestureName = hand ? (hand.pinch ? "Pinch" : hand.gesture.replaceAll("_", " ")) : "No hand";
   const confidence = Math.round((result?.tracking_confidence ?? 0) * 100);
@@ -251,6 +225,6 @@ export function WebcamPractice() {
       <span>Confidence <strong>{confidence}%</strong></span>
       <span>Latency <strong>{latency || "—"}{latency ? " ms" : ""}</strong></span>
     </div>
-    <div className="gesture-command-panel"><div><Hand size={14}/><strong>{hand ? `${gestureName} recognized` : "Show one hand to begin"}</strong></div><span>Point: select forearm</span><span>Pinch: pick tool</span><span>Thumb up / fist: advance</span><span>Open palm: release</span></div>
+    <div className="gesture-command-panel"><div><Hand size={14}/><strong>{hand ? `${gestureName} recognized` : "Show one hand to begin"}</strong></div><span>Point: select forearm</span><span>Pinch: pick nearby tool</span><span>Move: position instrument</span><span>Open palm: release</span></div>
   </div>;
 }

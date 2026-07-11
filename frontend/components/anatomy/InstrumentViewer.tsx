@@ -3,8 +3,7 @@
 import { Suspense, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Html, OrbitControls } from "@react-three/drei";
-import { Focus, RotateCcw, ScanLine } from "lucide-react";
-import { Badge } from "@/components/ui/Badge";
+import { Focus, RotateCcw } from "lucide-react";
 import { SceneErrorBoundary } from "./SceneErrorBoundary";
 import { SafeMedicalGLB } from "@/components/simulation/ModelRegistry";
 import { MODEL_PATHS } from "@/data/modelConfig";
@@ -19,19 +18,17 @@ const instruments = [
 export function InstrumentViewer() {
   const [active, setActive] = useState("holder");
   const [part, setPart] = useState("Tip");
-  const [explode, setExplode] = useState(false);
   const [cameraKey, setCameraKey] = useState(0);
   const instrument = instruments.find(item => item.id === active)!;
   return (
     <section className="instrument-section">
-      <div className="instrument-head"><div><p className="eyebrow">Instrument lab</p><h2>Understand the tool before the movement.</h2><p>Rotate the project&apos;s detailed instrument models and select functional zones to learn correct handling.</p></div><Badge tone="blue">Interactive 3D</Badge></div>
       <div className="instrument-layout">
         <div className="instrument-list">
           {instruments.map(item => <button key={item.id} className={active === item.id ? "active" : ""} onClick={() => { setActive(item.id); setPart("Tip"); }}><span className={`instrument-thumb ${item.id}`}><i /><b /></span><div><strong>{item.name}</strong><small>{item.use}</small></div></button>)}
         </div>
         <div className="instrument-stage panel">
-          <div className="instrument-stage-toolbar"><span>{instrument.name} · Inspection</span><div><button className={explode ? "active" : ""} onClick={() => setExplode(!explode)}><ScanLine size={13} />Exploded</button><button onClick={() => setPart("Tip")}><Focus size={13} />Tip</button><button onClick={() => setCameraKey(k => k + 1)} aria-label="Reset instrument view"><RotateCcw size={13} /></button></div></div>
-          <SceneErrorBoundary><Canvas camera={{ position: [0, 0, 5.3], fov: 38 }} dpr={[1,1.5]}><color attach="background" args={["#eaf3f8"]} /><ambientLight intensity={1.8} /><directionalLight position={[3,4,5]} intensity={2.5} color="#d7f7ff" /><directionalLight position={[-3,-2,2]} intensity={1} color="#2d7ac4" /><Suspense fallback={<Html center>Loading tool…</Html>}><LoadedInstrumentModel type={active} selectedPart={part} onSelect={setPart} explode={explode} /></Suspense><OrbitControls key={cameraKey} enablePan={false} minDistance={3.3} maxDistance={7} /></Canvas></SceneErrorBoundary>
+          <div className="instrument-stage-toolbar"><span>{instrument.name} · Inspection</span><div><button onClick={() => setPart("Tip")}><Focus size={13} />Focus tip</button><button onClick={() => setCameraKey(k => k + 1)} aria-label="Reset instrument view"><RotateCcw size={13} /></button></div></div>
+          <SceneErrorBoundary><Canvas camera={{ position: [0, 0, 5.3], fov: 38 }} dpr={[1,1.5]}><color attach="background" args={["#eaf3f8"]} /><ambientLight intensity={1.8} /><directionalLight position={[3,4,5]} intensity={2.5} color="#d7f7ff" /><directionalLight position={[-3,-2,2]} intensity={1} color="#2d7ac4" /><Suspense fallback={<Html center>Loading tool…</Html>}><LoadedInstrumentModel type={active} selectedPart={part} onSelect={setPart} explode={false} /></Suspense><OrbitControls key={cameraKey} enablePan={false} minDistance={3.3} maxDistance={7} /></Canvas></SceneErrorBoundary>
           <div className="instrument-part-tabs" role="group" aria-label="Instrument parts">{["Grip zone","Joint","Jaw","Tip"].map(item => <button key={item} className={part === item ? "active" : ""} onClick={() => setPart(item)}>{item}</button>)}</div>
         </div>
         <div className="instrument-info panel"><p className="eyebrow">Selected instrument</p><h3>{instrument.name}</h3><dl><div><dt>Primary use</dt><dd>{instrument.use}</dd></div><div><dt>Grip area</dt><dd>{instrument.grip}</dd></div><div><dt>Active tip</dt><dd>{instrument.tip}</dd></div><div><dt>Common handling mistake</dt><dd className="text-warning">{instrument.mistake}</dd></div></dl><div className="selected-part"><span>Current selection</span><strong>{part}</strong><p>{part === "Grip zone" ? "Position fingers lightly within the rings for stable, economical movement." : part === "Joint" ? "The joint translates handle pressure into controlled jaw movement." : part === "Jaw" ? "The jaw secures the needle without unnecessary force." : "Keep the active tip in view and away from no-touch zones."}</p></div></div>
