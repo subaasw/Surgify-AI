@@ -1,11 +1,49 @@
 "use client";
 
-import { useState } from "react";
-import { Bandage, Bone, ChevronDown, CircleDot, Eye, Focus, Hand, Layers3, MousePointer2, Move3d, ScanLine, Scissors, ShieldPlus, Sparkles, Stethoscope, Syringe, Waves, Webcam } from "lucide-react";
+import { Check, CircleDot, Eye, Focus, Hand, Layers3, MousePointer2, Move3d, ScanLine, Scissors, ShieldPlus, Sparkles, Stethoscope, Waves, Webcam, Crosshair } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSimulation } from "./SimulationProvider";
 
-const categories={Examine:["Inspect","Palpate","Check pulse","Check sensation","Check movement"],Prepare:["Gloves","Antiseptic","Sterile drape","Gauze","Local anaesthetic simulation"],Instruments:["Needle holder","Forceps","Surgical scissors","Curved needle","Suture material"],Actions:["Clean wound","Position instrument","Match angle","Begin stitch","Pull suture","Tie knot","Cut suture","Finish procedure"],View:["Room view","Patient view","Close-up view","Anatomy overlay","Tracking overlay","Switch to Webcam Practice"]};
-const icons:Record<string,typeof Eye>={Inspect:Eye,Palpate:Hand,"Check pulse":Stethoscope,"Check sensation":Waves,"Check movement":Move3d,Gloves:ShieldPlus,Antiseptic:Sparkles,"Sterile drape":Layers3,Gauze:Bandage,"Local anaesthetic simulation":Syringe,"Needle holder":MousePointer2,Forceps:Focus,"Surgical scissors":Scissors,"Curved needle":Bone,"Suture material":CircleDot,"Clean wound":Sparkles,"Position instrument":Move3d,"Match angle":ScanLine,"Begin stitch":MousePointer2,"Pull suture":Move3d,"Tie knot":CircleDot,"Cut suture":Scissors,"Finish procedure":ShieldPlus,"Room view":Eye,"Patient view":Focus,"Close-up view":ScanLine,"Anatomy overlay":Layers3,"Tracking overlay":ScanLine,"Switch to Webcam Practice":Webcam};
+const stepActions = [
+  ["Check allergies", "Review patient information"],
+  ["Inspect"],
+  ["Check pulse", "Check sensation", "Check movement"],
+  ["Gloves", "Antiseptic", "Sterile drape"],
+  ["Needle holder", "Forceps"],
+] as const;
 
-export function ToolBar(){const [manual,setManual]=useState<{step:number;category:keyof typeof categories}|null>(null);const {state,selectTool,performAction,setCameraMode,toggleAnatomy,toggleTracking}=useSimulation();const router=useRouter();const suggested=(["Examine","Examine","Examine","Prepare","Instruments","Actions","Actions"] as const)[state.currentStep]??"Examine";const category=manual?.step===state.currentStep?manual.category:suggested;const choose=(item:string)=>{if(item==="Room view")return setCameraMode("room");if(item==="Patient view")return setCameraMode("patient");if(item==="Close-up view")return setCameraMode("closeup");if(item==="Switch to Webcam Practice")return setCameraMode("webcam");if(item==="Anatomy overlay")return toggleAnatomy();if(item==="Tracking overlay")return toggleTracking();if(category==="Instruments")selectTool(item);else performAction(item);if(item==="Finish procedure"&&state.currentStep===6)window.setTimeout(()=>router.push("/results"),250)};return <div className="tool-bar"><div className="tool-categories">{Object.keys(categories).map(item=><button key={item} onClick={()=>setManual({step:state.currentStep,category:item as keyof typeof categories})} className={category===item?"active":""}>{item}<ChevronDown size={10}/></button>)}</div><div className="tool-items">{categories[category].map(item=>{const Icon=icons[item]??CircleDot;const selected=state.selectedTool===item||state.completedActions.includes(item)||(item==="Anatomy overlay"&&state.anatomyOverlay)||(item==="Tracking overlay"&&state.trackingOverlay);return <button className={selected?"selected":""} key={item} onClick={()=>choose(item)} title={item}><span><Icon size={17}/>{selected&&<i/>}</span><small>{item}</small></button>})}</div><div className="active-tool-slot"><span>Active tool</span><div><i><MousePointer2 size={15}/></i><strong>{state.selectedTool??"None selected"}</strong></div><small>{state.selectedTool?"Ready in scene":"Choose from Instruments"}</small></div></div>}
+const icons: Record<string, typeof Eye> = {
+  "Check allergies": Stethoscope, "Review patient information": Check, Inspect: Eye,
+  "Check pulse": Stethoscope, "Check sensation": Waves, "Check movement": Move3d,
+  Gloves: ShieldPlus, Antiseptic: Sparkles, "Sterile drape": Layers3,
+  "Needle holder": MousePointer2, Forceps: Focus, Scalpel: Crosshair, "Surgical scissors": Scissors,
+  "Finish procedure": ShieldPlus,
+};
+
+const viewActions = [["room", "Room", Eye], ["patient", "Patient", Focus], ["closeup", "Close-up", ScanLine]] as const;
+const instruments = new Set(["Needle holder", "Forceps", "Scalpel", "Surgical scissors"]);
+
+export function ToolBar() {
+  const router = useRouter();
+  const { state, selectTool, performAction, setCameraMode, toggleAnatomy, toggleTracking } = useSimulation();
+  const actions: readonly string[] = state.currentStep <= 4 ? stepActions[state.currentStep]
+    : state.currentStep === 5 ? ["Scalpel"]
+    : state.currentStep === 6 ? [state.stitchPhase === 5 ? "Surgical scissors" : "Needle holder"]
+    : ["Finish procedure"];
+  const label = state.currentStep < 3 ? "Assessment" : state.currentStep === 3 ? "Sterile preparation" : state.currentStep === 4 ? "Instrument setup" : state.currentStep === 5 ? "Incision control" : state.currentStep === 6 ? "Closure tool" : "Final check";
+  const choose = (item: string) => {
+    if (instruments.has(item)) selectTool(item); else performAction(item);
+    if (item === "Finish procedure") window.setTimeout(() => router.push("/results"), 250);
+  };
+
+  return <div className="tool-bar contextual-toolbar">
+    <div className="tool-context"><span>Recommended next</span><strong>{label}</strong><small>Only actions relevant to this stage are shown.</small></div>
+    <div className="tool-items">{actions.map(item => {
+      const Icon = icons[item] ?? CircleDot;
+      const selected = state.selectedTool === item || state.completedActions.includes(item) || (item === "Check allergies" && state.completedActions.includes("allergy"));
+      return <button className={selected ? "selected" : ""} key={item} onClick={() => choose(item)}><span><Icon size={18} />{selected && <i />}</span><small>{item}</small></button>;
+    })}</div>
+    <div className="view-actions">{viewActions.map(([mode, label, Icon]) => <button key={mode} className={state.cameraMode === mode ? "active" : ""} onClick={() => setCameraMode(mode)} title={`${label} view`}><Icon size={15} /><span>{label}</span></button>)}<button className={state.anatomyOverlay ? "active" : ""} onClick={toggleAnatomy} title="Anatomy overlay"><Layers3 size={15} /><span>Anatomy</span></button><button className={state.trackingOverlay ? "active" : ""} onClick={toggleTracking} title="Hand tracking"><Hand size={15} /><span>Hands</span></button><button onClick={() => setCameraMode("webcam")} title="Webcam practice"><Webcam size={15} /><span>Webcam</span></button></div>
+    <div className="active-tool-slot"><span>Active tool</span><div><i>{state.selectedTool === "Surgical scissors" ? <Scissors size={16} /> : state.selectedTool === "Scalpel" ? <Crosshair size={16} /> : <MousePointer2 size={16} />}</i><strong>{state.selectedTool ?? "None"}</strong></div><small>{state.selectedTool ? "Visible at the procedure site" : "Choose the recommended action"}</small></div>
+  </div>;
+}

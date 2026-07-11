@@ -11,13 +11,14 @@ import type { CameraMode } from "@/types/simulation";
 import { MedicalGLB, ModelErrorBoundary, SafeMedicalGLB } from "./ModelRegistry";
 import { GestureHand, HandTrackingDriver } from "./GestureHandControl";
 import { MODEL_PATHS } from "@/data/modelConfig";
+import { WoundSurface } from "./WoundSurface";
 
 const presets: Record<Exclude<CameraMode, "webcam"> | "pov", { position: [number, number, number]; target: [number, number, number] }> = {
   // first-person surgeon view: hands enter from the bottom edge like VR
   pov: { position: [0, 3.5, 4.3], target: [0, 1.35, -1] },
   room: { position: [3.45, 4.7, 5.9], target: [0, 1.15, 0] },
   patient: { position: [3.35, 3.4, 4.7], target: [0, 1.45, 0] },
-  closeup: { position: [-3.2, 2.6, 2.7], target: [-1.05, 1.48, .28] },
+  closeup: { position: [-1.3, 2.1, 0.4], target: [-1.05, 1.48, -0.15] },
   anatomy: { position: [3.35, 2.8, 4.2], target: [-.4, 1.5, .1] },
   tray: { position: [3.35, 3.3, -.2], target: [2.7, 1.15, -.7] },
 };
@@ -28,7 +29,7 @@ export function HospitalScene() {
   const patientProps = { selected: state.selectedRegion, anatomy: state.anatomyOverlay, stitchPhase: state.stitchPhase, selectedTool: state.selectedTool, onSelect: selectRegion };
   const proceduralPatient = <FallbackPatient {...patientProps} />;
   const legacyPatient = <ModelErrorBoundary fallback={proceduralPatient}><Suspense fallback={proceduralPatient}><LoadedLegacyPatient {...patientProps} /></Suspense></ModelErrorBoundary>;
-  return <SceneErrorBoundary>{state.trackingOverlay && <HandTrackingDriver />}<Canvas shadows dpr={1} camera={{ position: presets.room.position, fov: 44, near: .1, far: 40 }} gl={{ antialias: true }}><color attach="background" args={["#02070b"]} /><fog attach="fog" args={["#091119", 12, 23]} /><ambientLight intensity={.72} /><hemisphereLight args={["#eaf5f7", "#26333a", 1.25]} /><directionalLight castShadow position={[4, 8, 5]} intensity={2.2} color="#f7fbfa" shadow-mapSize={[512, 512]} /><pointLight position={[-4, 3.5, 1]} intensity={1.2} color="#b8dcf2" /><Environment resolution={32}><Lightformer form="rect" intensity={1.2} color="#e9fbff" scale={[8, 3, 1]} position={[0, 6, -1]} rotation={[Math.PI / 2, 0, 0]} /></Environment><CameraRig mode={state.trackingOverlay ? "pov" : state.cameraMode === "webcam" ? "room" : state.cameraMode} /><SafeMedicalGLB path={MODEL_PATHS.operationTheatre} targetSize={14} preserveMaterials castShadows={false} position={[0,1.66,0]} rotation={[0,Math.PI/2,0]} fallback={<HospitalRoom />} /><SafeMedicalGLB path={MODEL_PATHS.hospitalBed} targetSize={5.35} preserveMaterials position={[0,1.12,0]} fallback={<FallbackHospitalBed />} /><ModelErrorBoundary fallback={legacyPatient}><Suspense fallback={proceduralPatient}><LoadedPatient {...patientProps} /></Suspense></ModelErrorBoundary><FallbackMonitor /><IVStand /><InstrumentTray selectedTool={state.selectedTool} />{state.trackingOverlay && <GestureHand />}<ContactShadows frames={1} resolution={192} position={[0, .02, 0]} opacity={.32} scale={15} blur={2.6} far={5} /></Canvas></SceneErrorBoundary>;
+  return <SceneErrorBoundary>{state.trackingOverlay && state.cameraMode !== "webcam" && <HandTrackingDriver />}<Canvas shadows dpr={1} camera={{ position: presets.room.position, fov: 44, near: .1, far: 40 }} gl={{ antialias: true }}><color attach="background" args={["#02070b"]} /><fog attach="fog" args={["#091119", 12, 23]} /><ambientLight intensity={.72} /><hemisphereLight args={["#eaf5f7", "#26333a", 1.25]} /><directionalLight castShadow position={[4, 8, 5]} intensity={2.2} color="#f7fbfa" shadow-mapSize={[512, 512]} /><pointLight position={[-4, 3.5, 1]} intensity={1.2} color="#b8dcf2" /><Environment resolution={32}><Lightformer form="rect" intensity={1.2} color="#e9fbff" scale={[8, 3, 1]} position={[0, 6, -1]} rotation={[Math.PI / 2, 0, 0]} /></Environment><CameraRig mode={state.trackingOverlay || state.cameraMode === "webcam" ? "pov" : state.cameraMode} /><SafeMedicalGLB path={MODEL_PATHS.operationTheatre} targetSize={14} preserveMaterials castShadows={false} position={[0,1.66,0]} rotation={[0,Math.PI/2,0]} fallback={<HospitalRoom />} /><SafeMedicalGLB path={MODEL_PATHS.hospitalBed} targetSize={5.35} preserveMaterials position={[0,1.12,0]} fallback={<FallbackHospitalBed />} /><ModelErrorBoundary fallback={legacyPatient}><Suspense fallback={proceduralPatient}><LoadedPatient {...patientProps} /></Suspense></ModelErrorBoundary><FallbackMonitor /><IVStand /><InstrumentTray selectedTool={state.selectedTool} />{(state.trackingOverlay || state.cameraMode === "webcam") && <GestureHand />}<ContactShadows frames={1} resolution={192} position={[0, .02, 0]} opacity={.32} scale={15} blur={2.6} far={5} /></Canvas></SceneErrorBoundary>;
 }
 
 function CameraRig({ mode }: { mode: Exclude<CameraMode, "webcam"> | "pov" }) {
@@ -107,27 +108,27 @@ function LoadedLegacyPatient({ selected, anatomy, stitchPhase, selectedTool, onS
   </group>;
 }
 
-function PatientInteractionZones({ selected, anatomy, stitchPhase, selectedTool, onSelect }: PatientProps) {
+function PatientInteractionZones({ selected, anatomy, onSelect }: PatientProps) {
   return <group position={[0, 1.55, -.08]}>
     <group position={[0,.18,-1.65]}><Region region="Head" selected={selected} onSelect={onSelect}><mesh scale={[.48,.4,.55]}><sphereGeometry args={[1,16,12]} /><HitMaterial /></mesh></Region></group>
     <group position={[0,.1,-.62]}><Region region="Chest" selected={selected} onSelect={onSelect}><mesh rotation={[Math.PI/2,0,0]} scale={[.9,.56,1]}><capsuleGeometry args={[.48,1.05,8,14]} /><HitMaterial /></mesh></Region>{anatomy&&<TorsoAnatomy />}</group>
     <group position={[0,.08,.08]}><Region region="Abdomen" selected={selected} onSelect={onSelect}><mesh rotation={[Math.PI/2,0,0]} scale={[.8,.5,.82]}><capsuleGeometry args={[.45,.72,8,14]} /><HitMaterial /></mesh></Region></group>
     <PatientArmZone label="Left arm" x={1.05} selected={selected} onSelect={onSelect} />
-    <PatientArmZone label="Right arm" x={-1.05} selected={selected} onSelect={onSelect} wound stitchPhase={stitchPhase} selectedTool={selectedTool} anatomy={anatomy} />
+    <PatientArmZone label="Right arm" x={-1.05} selected={selected} onSelect={onSelect} wound anatomy={anatomy} />
     <PatientLegZone label="Left leg" x={.43} selected={selected} onSelect={onSelect} />
     <PatientLegZone label="Right leg" x={-.43} selected={selected} onSelect={onSelect} />
   </group>;
 }
 
 function HitMaterial() { return <meshBasicMaterial transparent opacity={.001} depthWrite={false} />; }
-function PatientArmZone({ label, x, selected, onSelect, wound = false, stitchPhase = 0, selectedTool, anatomy = false }: { label:string;x:number;selected:string|null;onSelect:(r:string)=>void;wound?:boolean;stitchPhase?:number;selectedTool?:string|null;anatomy?:boolean }) {
-  return <group position={[x,.07,-.15]}><Region region={label} selected={selected} onSelect={onSelect}><mesh rotation={[Math.PI/2,0,0]} position={[0,0,.05]}><capsuleGeometry args={[.2,1.45,8,14]} /><HitMaterial /></mesh>{wound && selected===label && <WoundTrainingPatch stitchPhase={stitchPhase} selectedTool={selectedTool} anatomy={anatomy} />}</Region></group>;
+function PatientArmZone({ label, x, selected, onSelect, wound = false, anatomy = false }: { label:string;x:number;selected:string|null;onSelect:(r:string)=>void;wound?:boolean;anatomy?:boolean }) {
+  return <group position={[x,.07,-.15]}><Region region={label} selected={selected} onSelect={onSelect}><mesh rotation={[Math.PI/2,0,0]} position={[0,0,.05]}><capsuleGeometry args={[.2,1.45,8,14]} /><HitMaterial /></mesh>{wound && selected===label && <WoundTrainingPatch anatomy={anatomy} />}</Region></group>;
 }
 function PatientLegZone({ label, x, selected, onSelect }: { label:string;x:number;selected:string|null;onSelect:(r:string)=>void }) {
   return <group position={[x,-.04,1.65]}><Region region={label} selected={selected} onSelect={onSelect}><mesh rotation={[Math.PI/2,0,0]}><capsuleGeometry args={[.27,1.75,8,14]} /><HitMaterial /></mesh></Region></group>;
 }
 
-export function FallbackPatient({ selected, anatomy, stitchPhase, selectedTool, onSelect }: PatientProps) {
+export function FallbackPatient({ selected, anatomy, onSelect }: PatientProps) {
   const chest = useRef<THREE.Group>(null);
   useFrame(({ clock }) => { if (chest.current) chest.current.scale.y = 1 + Math.sin(clock.elapsedTime * 1.4) * .012; });
   return <group position={[0,1.38,-.08]}>
@@ -135,7 +136,7 @@ export function FallbackPatient({ selected, anatomy, stitchPhase, selectedTool, 
     <group ref={chest} position={[0,.1,-.62]}><Region region="Chest" selected={selected} onSelect={onSelect}><mesh castShadow rotation={[Math.PI/2,0,0]} scale={[.84,.5,1]}><capsuleGeometry args={[.48,1.05,10,20]} /><meshStandardMaterial color="#668ca4" roughness={.82} emissive={selected === "Chest" ? "#2c8d9a" : "#000"} emissiveIntensity={.28} transparent={anatomy} opacity={anatomy ? .42 : 1} /></mesh><mesh position={[0,.23,-.05]} rotation={[-Math.PI/2,0,0]}><boxGeometry args={[1.28,.72,.03]} /><meshStandardMaterial color="#81a6b9" roughness={.8} /></mesh></Region>{anatomy&&<TorsoAnatomy />}</group>
     <group position={[0,.08,.08]}><Region region="Abdomen" selected={selected} onSelect={onSelect}><mesh castShadow rotation={[Math.PI/2,0,0]} scale={[.74,.44,.78]}><capsuleGeometry args={[.45,.72,10,18]} /><meshStandardMaterial color="#668ca4" roughness={.82} emissive={selected === "Abdomen" ? "#2c8d9a" : "#000"} emissiveIntensity={.28} transparent={anatomy} opacity={anatomy ? .42 : 1} /></mesh></Region></group>
     <Arm side="left" x={1.05} selected={selected} anatomy={anatomy} onSelect={onSelect} />
-    <Arm side="right" x={-1.05} selected={selected} anatomy={anatomy} onSelect={onSelect} wound stitchPhase={stitchPhase} selectedTool={selectedTool} />
+    <Arm side="right" x={-1.05} selected={selected} anatomy={anatomy} onSelect={onSelect} wound />
     <group position={[0,0,1.28]}><RoundedBox args={[1.65,.33,2.45]} radius={.2} castShadow><meshStandardMaterial color="#d9e8eb" roughness={.92} /></RoundedBox><mesh position={[0,.19,-.6]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[1.42,.55]} /><meshStandardMaterial color="#a9c9d1" /></mesh></group>
     <Leg side="Left" x={.43} selected={selected} anatomy={anatomy} onSelect={onSelect} />
     <Leg side="Right" x={-.43} selected={selected} anatomy={anatomy} onSelect={onSelect} />
@@ -150,9 +151,9 @@ function Region({ region, selected, onSelect, children }: { region: string; sele
   return <group onClick={e => { e.stopPropagation(); onSelect(region); }} onPointerOver={e => { e.stopPropagation(); setHovered(true); document.body.style.cursor = "pointer"; }} onPointerOut={() => { setHovered(false); document.body.style.cursor = ""; }}>{children}{hovered && <Html center position={[0,.55,.2]}><span className="body-region-label">{region}</span></Html>}{(hovered || selected === region) && <mesh rotation={[-Math.PI/2,0,0]} position={[0,.28,0]}><ringGeometry args={[.42,.48,32]} /><meshBasicMaterial color="#55c9d5" transparent opacity={selected === region ? .65 : .35} side={THREE.DoubleSide} /></mesh>}</group>;
 }
 
-function Arm({ side, x, selected, anatomy, onSelect, wound = false, stitchPhase = 0, selectedTool }: { side: "left"|"right"; x: number; selected: string|null; anatomy:boolean; onSelect:(r:string)=>void; wound?:boolean; stitchPhase?:number; selectedTool?:string|null }) {
+function Arm({ side, x, selected, anatomy, onSelect, wound = false }: { side: "left"|"right"; x: number; selected: string|null; anatomy:boolean; onSelect:(r:string)=>void; wound?:boolean }) {
   const label = side === "right" ? "Right arm" : "Left arm";
-  return <group position={[x,.07,-.15]}><Region region={label} selected={selected} onSelect={onSelect}><mesh castShadow rotation={[Math.PI/2,0,0]} position={[0,0,-.35]}><capsuleGeometry args={[.18,.64,8,16]} /><SkinMaterial selected={selected===label} anatomy={anatomy} /></mesh><mesh castShadow rotation={[Math.PI/2,0,0]} position={[0,0,.43]}><capsuleGeometry args={[.15,.7,8,16]} /><SkinMaterial selected={selected===label} anatomy={anatomy} /></mesh><mesh castShadow position={[0,.01,.92]} scale={[.18,.12,.25]}><sphereGeometry args={[1,18,12]} /><SkinMaterial selected={selected===label} anatomy={anatomy} /></mesh>{wound && selected===label && <WoundTrainingPatch stitchPhase={stitchPhase} selectedTool={selectedTool} anatomy={anatomy} />}</Region></group>;
+  return <group position={[x,.07,-.15]}><Region region={label} selected={selected} onSelect={onSelect}><mesh castShadow rotation={[Math.PI/2,0,0]} position={[0,0,-.35]}><capsuleGeometry args={[.18,.64,8,16]} /><SkinMaterial selected={selected===label} anatomy={anatomy} /></mesh><mesh castShadow rotation={[Math.PI/2,0,0]} position={[0,0,.43]}><capsuleGeometry args={[.15,.7,8,16]} /><SkinMaterial selected={selected===label} anatomy={anatomy} /></mesh><mesh castShadow position={[0,.01,.92]} scale={[.18,.12,.25]}><sphereGeometry args={[1,18,12]} /><SkinMaterial selected={selected===label} anatomy={anatomy} /></mesh>{wound && selected===label && <WoundTrainingPatch anatomy={anatomy} />}</Region></group>;
 }
 
 function Leg({ side, x, selected, anatomy, onSelect }: { side:"Left"|"Right";x:number;selected:string|null;anatomy:boolean;onSelect:(r:string)=>void }) {
@@ -160,11 +161,9 @@ function Leg({ side, x, selected, anatomy, onSelect }: { side:"Left"|"Right";x:n
   return <group position={[x,-.04,1.65]}><Region region={label} selected={selected} onSelect={onSelect}><mesh rotation={[Math.PI/2,0,0]}><capsuleGeometry args={[.24,1.7,8,16]} /><SkinMaterial selected={selected===label} anatomy={anatomy} /></mesh></Region></group>;
 }
 
-function WoundTrainingPatch({ stitchPhase, selectedTool, anatomy }: { stitchPhase:number;selectedTool?:string|null;anatomy:boolean }) {
+function WoundTrainingPatch({ anatomy }: { anatomy:boolean }) {
   const { state } = useSimulation();
-  const arc = useMemo(() => Array.from({length:18},(_,i)=>{const t=i/17;return [Math.sin(t*Math.PI)*.2,.035, -.04+t*.48] as [number,number,number]}),[]);
-  const holderPosition: [number,number,number] = [.28+Math.min(stitchPhase,3)*-.07+(state.suturePosition-50)*.003,.48,-.18+Math.min(stitchPhase,3)*.07];
-  return <group position={[0,.18,.33]} rotation={[0,0,0]}><RoundedBox args={[.42,.035,.72]} radius={.08}><meshStandardMaterial color="#d9a58d" roughness={.7} /></RoundedBox><mesh position={[0,.025,0]} rotation={[-Math.PI/2,0,0]}><boxGeometry args={[.025,.36,.006]} /><meshStandardMaterial color="#875252" /></mesh><mesh position={[0,.032,-.22]} rotation={[-Math.PI/2,0,0]}><torusGeometry args={[.07,.012,8,24]} /><meshBasicMaterial color="#43cbd6" /></mesh><mesh position={[0,.032,.22]} rotation={[-Math.PI/2,0,0]}><torusGeometry args={[.07,.012,8,24]} /><meshBasicMaterial color="#49c880" /></mesh><Line points={arc} color="#61d6df" lineWidth={1.5} dashed dashScale={15} /><mesh position={[0,.031,.38]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[.18,.21,32]} /><meshBasicMaterial color="#d85d68" transparent opacity={.35} side={THREE.DoubleSide} /></mesh>{anatomy&&<ForearmAnatomy />}{selectedTool==="Needle holder"&&<SafeMedicalGLB path={MODEL_PATHS.needleHolder} targetSize={.72} color="#bcc8cc" metalness={.84} roughness={.2} preserveTextures={false} position={holderPosition} rotation={[Math.PI/2,0,-THREE.MathUtils.degToRad(state.sutureAngle)]} fallback={<FallbackNeedleHolder phase={stitchPhase}/>} />} {stitchPhase>=3&&<group><mesh position={[0,.08,.04]} rotation={[Math.PI/2,0,0]}><torusGeometry args={[.16,.015,8,32,Math.PI*1.3]} /><meshStandardMaterial color="#c9d3d7" metalness={.7} /></mesh><Line points={stitchPhase>=4?[[-.1,.05,.04],[-.2,.09,.2],[-.05,.1,.33]]:[[-.1,.05,.04],[-.18,.08,.16]]} color="#516b87" lineWidth={1.2}/></group>}</group>;
+  return <group position={[0, .18, .33]}><WoundSurface incisionProgress={state.incisionProgress} incisionComplete={state.incisionComplete} stitchPhase={state.stitchPhase} stitchProgress={state.stitchProgress} suturePosition={state.suturePosition} sutureAngle={state.sutureAngle} anatomy={anatomy} selectedTool={state.selectedTool} />{anatomy && <ForearmAnatomy />}</group>;
 }
 
 function ForearmAnatomy(){return <group position={[0,.08,0]}><mesh position={[-.09,0,0]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[.025,.025,.6,12]}/><meshStandardMaterial color="#eee5c9"/></mesh><mesh position={[.09,0,0]} rotation={[Math.PI/2,0,0]}><cylinderGeometry args={[.025,.025,.6,12]}/><meshStandardMaterial color="#eee5c9"/></mesh><Line points={[[-.14,.03,-.28],[-.12,.03,.28]]} color="#c6575d" lineWidth={2}/><Line points={[[.14,.03,-.28],[.11,.03,.28]]} color="#e1bc4f" lineWidth={1.5}/><Html position={[.28,.1,-.1]}><div className="anatomy-scene-labels"><span>Radius / ulna</span><span>Vessel path</span><span>Nerve path</span></div></Html></group>}

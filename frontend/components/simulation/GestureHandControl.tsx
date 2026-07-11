@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
@@ -248,6 +248,9 @@ const vUp = new THREE.Vector3();
 const vForward = new THREE.Vector3();
 const liveBasis = new THREE.Matrix4();
 const liveQuat = new THREE.Quaternion();
+const worldQuat = new THREE.Quaternion();
+const cameraLocal = new THREE.Vector3();
+const cameraWorld = new THREE.Vector3();
 const parentQuat = new THREE.Quaternion();
 const invQuat = new THREE.Quaternion();
 const targetQuat = new THREE.Quaternion();
@@ -269,13 +272,14 @@ export function GestureHand() {
  */
 function RiggedHand({ side }: { side: Side }) {
   const { scene } = useGLTF(MODEL_PATHS.hand);
+  const { camera } = useThree();
   const root = useRef<THREE.Group>(null);
   const rot = useRef<THREE.Group>(null);
   const wasLive = useRef(false);
   const axes = useRef({
     x: { value: 0, velocity: 0 },
-    y: { value: WORKSPACE.floorY, velocity: 0 },
-    z: { value: 0, velocity: 0 },
+    y: { value: 0, velocity: 0 },
+    z: { value: -3, velocity: 0 },
   });
 
   const { rig, restQuatInv, restPalm, fingers } = useMemo(() => {
@@ -341,20 +345,31 @@ function RiggedHand({ side }: { side: Side }) {
     vUp.set(pose.axes.up[0], pose.axes.up[1], pose.axes.up[2]);
     vForward.set(pose.axes.forward[0], pose.axes.forward[1], pose.axes.forward[2]);
     liveQuat.setFromRotationMatrix(liveBasis.makeBasis(vAcross, vUp, vForward)).multiply(restQuatInv);
+    worldQuat.copy(camera.quaternion).multiply(liveQuat);
+
+    const distance = 2.6 + pose.screen.depth * 3.2;
+    const perspective = camera as THREE.PerspectiveCamera;
+    const halfHeight = Math.tan(THREE.MathUtils.degToRad(perspective.fov || 44) / 2) * distance;
+    const targetX = pose.screen.x * halfHeight * (perspective.aspect || 1) * .82;
+    const targetY = pose.screen.y * halfHeight * .72;
+    const targetZ = -distance;
 
     if (!wasLive.current) { // reappearing: snap to the hand, don't fly in
       wasLive.current = true;
-      a.x.value = pose.x; a.y.value = pose.y; a.z.value = pose.z;
+      a.x.value = targetX; a.y.value = targetY; a.z.value = targetZ;
       a.x.velocity = a.y.velocity = a.z.velocity = 0;
-      rotGroup.quaternion.copy(liveQuat);
+      rotGroup.quaternion.copy(worldQuat);
     }
     // stiff springs: tracking is realtime, so follow tightly and let the
     // damping kill jitter rather than adding visible lag
-    springStep(a.x, pose.x, delta, 170, 26);
-    springStep(a.y, pose.y, delta, 170, 26);
-    springStep(a.z, pose.z, delta, 170, 26);
-    group.position.set(a.x.value, Math.max(a.y.value, WORKSPACE.floorY), a.z.value);
-    rotGroup.quaternion.slerp(liveQuat, damp(20, delta));
+    springStep(a.x, targetX, delta, 170, 26);
+    springStep(a.y, targetY, delta, 170, 26);
+    springStep(a.z, targetZ, delta, 170, 26);
+    cameraLocal.set(a.x.value, a.y.value, a.z.value);
+    cameraWorld.copy(cameraLocal).applyQuaternion(camera.quaternion).add(camera.position);
+    cameraWorld.y = Math.max(cameraWorld.y, WORKSPACE.floorY);
+    group.position.copy(cameraWorld);
+    rotGroup.quaternion.slerp(worldQuat, damp(20, delta));
 
     // skeletal retargeting: aim every phalanx at its landmark segment,
     // expressed in the palm basis so it composes with the hand orientation

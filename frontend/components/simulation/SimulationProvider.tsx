@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import type { CameraMode, CoachMessage, SimulationState } from "@/types/simulation";
-import { procedureSteps } from "@/data/simulationData";
+import { procedureSteps, stitchActions } from "@/data/simulationData";
 
 const createInitialState = (): SimulationState => ({
   runStatus: "ready",
@@ -19,11 +19,19 @@ const createInitialState = (): SimulationState => ({
   vitals: { heartRate: 88, systolic: 122, diastolic: 78, oxygenSaturation: 98, respiratoryRate: 16, temperature: 36.8 },
   feedback: [{ id: "ready", tone: "info", title: "Case briefing ready", message: "Review the objective and choose an input method to begin.", timestamp: 0 }],
   anatomyOverlay: false,
-  trackingOverlay: true, // POV hands on by default — the surgeon sees their own hands
+  trackingOverlay: false, // POV hands off by default
+  events: [],
+  uiCollapsed: false,
+
+  // Incision state
+  incisionProgress: 0,
+  incisionComplete: false,
+
+  // Suture state
   stitchPhase: 0,
+  stitchProgress: 0,
   suturePosition: 22,
   sutureAngle: 68,
-  events: [],
 });
 
 type SimulationContextValue = {
@@ -37,9 +45,12 @@ type SimulationContextValue = {
   setPaused: (paused: boolean) => void;
   setSuturePosition: (position: number) => void;
   setSutureAngle: (angle: number) => void;
+  setIncisionProgress: (progress: number) => void;
+  setStitchProgress: (progress: number) => void;
   resetSimulation: () => void;
   toggleAnatomy: () => void;
   toggleTracking: () => void;
+  setUiCollapsed: (collapsed: boolean) => void;
 };
 
 const SimulationContext = createContext<SimulationContextValue | null>(null);
@@ -59,11 +70,25 @@ function addFeedback(current: SimulationState, title: string, message: string, t
 function completeCurrentStep(current: SimulationState, id: string, message: string): SimulationState {
   const index = stepIndex(id);
   if (index !== current.currentStep) {
-    return addFeedback(current, "Complete the current objective first", `Finish “${procedureSteps[current.currentStep].title}” before moving ahead.`, "warning", -2);
+    return addFeedback(current, "Complete the current objective first", `Finish "${procedureSteps[current.currentStep].title}" before moving ahead.`, "warning", -2);
   }
   const completedSteps = addAction(current.completedSteps, id);
   const next = procedureSteps.findIndex(step => !completedSteps.includes(step.id));
-  return addFeedback({ ...current, completedSteps, currentStep: next < 0 ? procedureSteps.length - 1 : next }, "Objective completed", message, "success");
+  const nextStep = next < 0 ? procedureSteps.length - 1 : next;
+
+  let nextCameraMode = current.cameraMode;
+  let nextUiCollapsed = current.uiCollapsed;
+  if (nextStep === 4) nextCameraMode = "tray";
+  if (nextStep >= 5 && nextStep <= 6) {
+     nextCameraMode = "closeup";
+     nextUiCollapsed = true;
+  }
+  if (nextStep === 7) {
+     nextCameraMode = "room";
+     nextUiCollapsed = false;
+  }
+
+  return addFeedback({ ...current, completedSteps, currentStep: nextStep, cameraMode: nextCameraMode, uiCollapsed: nextUiCollapsed }, "Objective completed", message, "success");
 }
 
 export function SimulationProvider({ children }: { children: ReactNode }) {
@@ -102,8 +127,15 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const selectTool = useCallback((tool: string) => setState(current => {
     if (current.runStatus !== "active") return current;
     const selected = { ...current, selectedTool: tool };
+
+    // Scalpel selection during incision step
+    if (tool === "Scalpel") {
+      if (current.currentStep !== 5) return addFeedback(selected, "Scalpel not needed yet", `Finish "${procedureSteps[current.currentStep].title}" first.`, "warning", -1);
+      return addFeedback(selected, "Scalpel ready", "Trace along the marked incision line to make the cut.", "info");
+    }
+
     if (current.currentStep > 4) return addFeedback(selected, `${tool} active`, tool === "Needle holder" ? "Needle holder ready for guided closure." : "Tool placed in the active slot.", "info");
-    if (current.currentStep !== 4) return addFeedback(selected, "Instrument selected early", `Finish “${procedureSteps[current.currentStep].title}” before instrument setup.`, "warning", -1);
+    if (current.currentStep !== 4) return addFeedback(selected, "Instrument selected early", `Finish "${procedureSteps[current.currentStep].title}" before instrument setup.`, "warning", -1);
     if (!['Needle holder','Forceps'].includes(tool)) return addFeedback(selected, "Instrument not required", "This exercise requires a needle holder and forceps.", "warning", -2);
     const completedActions = addAction(current.completedActions, tool);
     const ready = completedActions.includes("Needle holder") && completedActions.includes("Forceps");
@@ -130,7 +162,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
 
     const assessmentActions = ["Check pulse", "Check sensation", "Check movement"];
     if (assessmentActions.includes(action)) {
-      if (current.currentStep !== 2) return addFeedback(current, "Assessment out of sequence", `Finish “${procedureSteps[current.currentStep].title}” first.`, "warning", -1);
+      if (current.currentStep !== 2) return addFeedback(current, "Assessment out of sequence", `Finish "${procedureSteps[current.currentStep].title}" first.`, "warning", -1);
       const completedActions = addAction(current.completedActions, action);
       const ready = assessmentActions.every(item => completedActions.includes(item));
       const next = { ...current, completedActions };
@@ -140,7 +172,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
 
     const preparationActions = ["Gloves", "Antiseptic", "Sterile drape"];
     if ([...preparationActions, "Gauze", "Clean wound", "Local anaesthetic simulation"].includes(action)) {
-      if (current.currentStep !== 3) return addFeedback(current, "Preparation out of sequence", `Finish “${procedureSteps[current.currentStep].title}” first.`, "warning", -1);
+      if (current.currentStep !== 3) return addFeedback(current, "Preparation out of sequence", `Finish "${procedureSteps[current.currentStep].title}" first.`, "warning", -1);
       const completedActions = addAction(current.completedActions, action);
       const ready = preparationActions.every(item => completedActions.includes(item));
       const next = { ...current, completedActions };
@@ -148,22 +180,46 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       return addFeedback(next, action, `${preparationActions.filter(item => !completedActions.includes(item)).length} required preparation item${preparationActions.filter(item => !completedActions.includes(item)).length === 1 ? "" : "s"} remaining.`, "success");
     }
 
-    const stitchActions = ["Position instrument", "Match angle", "Begin stitch", "Pull suture", "Tie knot", "Cut suture"];
-    if (stitchActions.includes(action)) {
-      if (current.currentStep !== 5) return addFeedback(current, "Closure not ready", `Finish “${procedureSteps[current.currentStep].title}” first.`, "warning", -2);
-      if (current.selectedTool !== "Needle holder") return addFeedback(current, "Needle holder required", "Select the needle holder before continuing the guided closure.", "error", -2);
+    // ── Incision actions ──
+    const incisionActions = ["Begin incision", "Complete incision"];
+    if (incisionActions.includes(action)) {
+      if (current.currentStep !== 5) return addFeedback(current, "Incision not ready", `Finish "${procedureSteps[current.currentStep].title}" first.`, "warning", -2);
+      if (current.selectedTool !== "Scalpel") return addFeedback(current, "Scalpel required", "Select the scalpel before making the incision.", "error", -2);
+
+      if (action === "Begin incision") {
+        return addFeedback(
+          { ...current, completedActions: addAction(current.completedActions, action) },
+          "Incision started", "Trace along the marked line. Maintain even depth and speed.", "info"
+        );
+      }
+
+      if (action === "Complete incision") {
+        if (current.incisionProgress < 0.85) return addFeedback(current, "Incision incomplete", "Continue tracing along the full incision path.", "warning");
+        return completeCurrentStep(
+          { ...current, incisionComplete: true, incisionProgress: 1, completedActions: addAction(current.completedActions, action), selectedTool: "Needle holder" },
+          "incision", "Incision completed cleanly. Switching to needle holder for wound closure."
+        );
+      }
+    }
+
+    // ── Stitch actions ──
+    if ((stitchActions as readonly string[]).includes(action)) {
+      if (current.currentStep !== 6) return addFeedback(current, "Closure not ready", `Finish "${procedureSteps[current.currentStep].title}" first.`, "warning", -2);
+      const requiredTool = action === "Cut suture" ? "Surgical scissors" : "Needle holder";
+      if (current.selectedTool !== requiredTool) return addFeedback(current, `${requiredTool} required`, `Select ${requiredTool.toLowerCase()} before continuing.`, "error", -2);
       const expected = stitchActions[current.stitchPhase];
-      if (action !== expected) return addFeedback(current, "Follow the guided sequence", `Complete “${expected}” next.`, "warning", -1);
+      if (action !== expected) return addFeedback(current, "Follow the guided sequence", `Complete "${expected}" next.`, "warning", -1);
       if (action === "Position instrument" && (current.suturePosition < 43 || current.suturePosition > 57)) return addFeedback(current, "Entry point not aligned", "Move the holder into the highlighted entry zone.", "warning");
       if (action === "Match angle" && (current.sutureAngle < 45 || current.sutureAngle > 60)) return addFeedback(current, "Angle outside target", "Adjust the approach to 45°–60°.", "warning");
       const stitchPhase = current.stitchPhase + 1;
-      const next = { ...current, stitchPhase, completedActions: addAction(current.completedActions, action) };
-      if (stitchPhase === stitchActions.length) return completeCurrentStep(next, "suture", "The guided interrupted stitch and knot sequence are complete.");
+      const next = { ...current, stitchPhase, stitchProgress: 0, completedActions: addAction(current.completedActions, action) };
+
+      if (stitchPhase === stitchActions.length) return completeCurrentStep({ ...next, selectedTool: null }, "suture", "The interrupted stitch is approximated, secured, and trimmed.");
       return addFeedback(next, action, action === "Begin stitch" ? "Needle followed the guided arc to the exit marker." : "Movement accepted. Continue to the next closure action.", "success");
     }
 
     if (action === "Finish procedure") {
-      if (current.currentStep !== 6 || !current.completedSteps.includes("suture")) return addFeedback(current, "Procedure not ready to finish", "Complete the guided closure before final reassessment.", "error", -3);
+      if (current.currentStep !== 7 || !current.completedSteps.includes("suture")) return addFeedback(current, "Procedure not ready to finish", "Complete the guided closure before final reassessment.", "error", -3);
       const completed = completeCurrentStep({ ...current, completedActions: addAction(addAction(current.completedActions, "safety"), action) }, "complete", "Final site and safety reassessment completed.");
       const finished = { ...completed, runStatus: "complete" as const, paused: false };
       try { localStorage.setItem("surgify:simulation-result", JSON.stringify({ score: finished.score, elapsedTime: finished.elapsedTime, completedSteps: finished.completedSteps, completedActions: finished.completedActions, events: finished.events, suturePosition: finished.suturePosition, sutureAngle: finished.sutureAngle, completedAt: new Date().toISOString() })); } catch { /* local persistence is optional */ }
@@ -171,7 +227,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     }
 
     if (["Inspect", "Inspect wound", "Palpate"].includes(action)) return addFeedback(current, action, current.currentStep === 1 ? "Select the reported injury directly on the patient." : "Observation recorded. Continue with the current objective.", "info");
-    return addFeedback(current, `${action} unavailable`, `Finish “${procedureSteps[current.currentStep].title}” first.`, "warning", -1);
+    return addFeedback(current, `${action} unavailable`, `Finish "${procedureSteps[current.currentStep].title}" first.`, "warning", -1);
   }), []);
 
   const value = useMemo<SimulationContextValue>(() => ({
@@ -185,9 +241,12 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     setPaused: paused => setState(current => current.runStatus === "active" ? { ...current, paused } : current),
     setSuturePosition: position => setState(current => ({ ...current, suturePosition: position })),
     setSutureAngle: angle => setState(current => ({ ...current, sutureAngle: angle })),
+    setIncisionProgress: progress => setState(current => ({ ...current, incisionProgress: Math.min(1, Math.max(0, progress)) })),
+    setStitchProgress: progress => setState(current => ({ ...current, stitchProgress: Math.min(1, Math.max(0, progress)) })),
     resetSimulation: () => setState(createInitialState()),
     toggleAnatomy: () => setState(current => ({ ...current, anatomyOverlay: !current.anatomyOverlay, cameraMode: !current.anatomyOverlay ? "anatomy" : "patient" })),
     toggleTracking: () => setState(current => ({ ...current, trackingOverlay: !current.trackingOverlay })),
+    setUiCollapsed: (collapsed) => setState(current => ({ ...current, uiCollapsed: collapsed })),
   }), [state, startSimulation, selectRegion, selectTool, releaseTool, performAction]);
 
   return <SimulationContext.Provider value={value}>{children}</SimulationContext.Provider>;

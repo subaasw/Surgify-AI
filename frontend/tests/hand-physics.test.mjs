@@ -15,7 +15,17 @@ function flatHand(over = {}) {
 test("centered hand maps near the workspace center", () => {
   const pose = palmPose(flatHand());
   assert.ok(Math.abs(pose.x) < .2);
+  assert.ok(Math.abs(pose.screen.x) < .2 && Math.abs(pose.screen.y) < .2);
   assert.ok(pose.y >= WORKSPACE.floorY && pose.y <= WORKSPACE.y[1]);
+});
+
+test("screen pose mirrors camera input into the surgeon POV", () => {
+  const right = flatHand();
+  right.landmarks.forEach(point => { point.x = .25; });
+  const left = flatHand();
+  left.landmarks.forEach(point => { point.x = .75; });
+  assert.ok(palmPose(right).screen.x > 0);
+  assert.ok(palmPose(left).screen.x < 0);
 });
 
 test("bigger apparent hand (closer to camera) reaches deeper into the scene", () => {

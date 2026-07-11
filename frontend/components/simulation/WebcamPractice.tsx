@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Camera, CameraOff, Hand, RefreshCw, ScanLine } from "lucide-react";
 import { useSimulation } from "./SimulationProvider";
+import { handStore, type TrackedHand } from "./GestureHandControl";
 
 type Landmark = { x: number; y: number; z: number };
 type VisionHand = {
@@ -59,6 +60,7 @@ export function WebcamPractice() {
     streamRef.current?.getTracks().forEach(track => track.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
+    handStore.hands = [];
   }, []);
 
   const startCamera = useCallback(async () => {
@@ -108,6 +110,19 @@ export function WebcamPractice() {
       setLatency(Math.round(performance.now() - started));
       setStatus("active");
       setError("");
+
+      // Update global handStore for 3D rigged hands
+      const trackedHands: TrackedHand[] = next.hands.map(hand => ({
+        handedness: hand.handedness,
+        gesture: hand.gesture,
+        pinch: hand.pinch,
+        pointer: hand.pointer,
+        landmarks: hand.landmarks,
+        world: hand.landmarks,
+        side: hand.handedness === "Left" ? "Right" as const : "Left" as const,
+      }));
+      handStore.hands = trackedHands;
+      handStore.at = performance.now();
     } catch (visionError) {
       setError(`${visionError instanceof Error ? visionError.message : "Vision service unavailable"} Start the backend on port 8000.`);
       setStatus("failed");
@@ -117,17 +132,24 @@ export function WebcamPractice() {
   }, []);
 
   useEffect(() => {
-    if (status !== "connecting" && status !== "active") return;
-    const tick = (time: number) => {
-      if (time - lastFrameRef.current >= FRAME_INTERVAL_MS) {
-        lastFrameRef.current = time;
-        void analyzeFrame();
-      }
+    if (status === "connecting" || status === "active") {
+      const tick = (time: number) => {
+        if (time - lastFrameRef.current >= FRAME_INTERVAL_MS) {
+          lastFrameRef.current = time;
+          void analyzeFrame();
+        }
+        loopRef.current = requestAnimationFrame(tick);
+      };
       loopRef.current = requestAnimationFrame(tick);
-    };
-    loopRef.current = requestAnimationFrame(tick);
+    }
     return () => { if (loopRef.current !== null) cancelAnimationFrame(loopRef.current); };
   }, [status, analyzeFrame]);
+
+  useEffect(() => {
+    if (status !== "idle") return;
+    const frame = requestAnimationFrame(() => { void startCamera(); });
+    return () => cancelAnimationFrame(frame);
+  }, [status, startCamera]);
 
   useEffect(() => stopCamera, [stopCamera]);
 

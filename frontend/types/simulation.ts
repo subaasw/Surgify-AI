@@ -1,4 +1,4 @@
-export type CameraMode = "room" | "patient" | "closeup" | "webcam" | "anatomy" | "tray";
+export type CameraMode = "room" | "patient" | "closeup" | "webcam" | "anatomy" | "tray" | "incision";
 
 export type PatientVitals = {
   heartRate: number;
@@ -41,8 +41,19 @@ export type SimulationState = {
   feedback: CoachMessage[];
   anatomyOverlay: boolean;
   trackingOverlay: boolean;
+  events: SimulationEvent[];
+  uiCollapsed: boolean;
+
+  // ── Incision state ──
+  /** 0→1 progress along the incision path while the scalpel is cutting. */
+  incisionProgress: number;
+  /** True once the full incision is completed. */
+  incisionComplete: boolean;
+
+  // ── Suture state ──
   stitchPhase: number;
+  /** 0→1 continuous animation progress within the current stitch phase. */
+  stitchProgress: number;
   suturePosition: number;
   sutureAngle: number;
-  events: SimulationEvent[];
 };

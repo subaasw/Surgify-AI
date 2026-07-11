@@ -1,12 +1,17 @@
 export const procedureSteps = [
-  { id: "review", title: "Review patient information", instruction: "Confirm the patient identity, complaint, mechanism, and allergy status.", hint: "Use the patient panel before examining the injury." },
-  { id: "identify", title: "Inspect the wound", instruction: "Select the injured right forearm directly on the patient.", hint: "The patient reports pain around the right forearm." },
-  { id: "assess", title: "Check distal circulation", instruction: "Check pulse, sensation, and finger movement before preparing the field.", hint: "Assessment should precede wound closure." },
-  { id: "prepare", title: "Prepare sterile field", instruction: "Apply gloves, cleanse the synthetic patch, and place a sterile drape.", hint: "Select preparation supplies from the toolbar." },
-  { id: "instruments", title: "Select instruments", instruction: "Choose the needle holder and forceps for the guided exercise.", hint: "The needle holder is the primary active tool." },
-  { id: "suture", title: "Perform simulated suturing", instruction: "Position the tool, match the target angle, and follow the guided arc.", hint: "Recommended approach angle: 45°–60°." },
-  { id: "complete", title: "Reassess and complete", instruction: "Finish the knot, cut the suture, and complete the safety check.", hint: "Review the stitch before ending the scenario." },
+  { id: "review", title: "Verify the case", instruction: "Confirm patient identity, injury history, and allergy status.", hint: "Ask about allergies, then confirm the review in the patient panel." },
+  { id: "identify", title: "Identify the procedure site", instruction: "Inspect the patient and select the injured right forearm.", hint: "Use the reported pain location to identify the correct site." },
+  { id: "assess", title: "Complete the neurovascular check", instruction: "Check distal pulse, sensation, and finger movement.", hint: "Document all three findings before preparing the field." },
+  { id: "prepare", title: "Establish the sterile field", instruction: "Apply gloves, cleanse the synthetic pad, and place a sterile drape.", hint: "The action dock shows only the required preparation items." },
+  { id: "instruments", title: "Prepare closure instruments", instruction: "Confirm the needle holder and forceps before the hands-on exercise.", hint: "Select both instruments; the needle holder remains active." },
+  { id: "incision", title: "Create the practice incision", instruction: "Use the scalpel to trace the guide on the synthetic training pad.", hint: "This is a non-graphic skills pad, not an incision on the patient." },
+  { id: "suture", title: "Place one interrupted suture", instruction: "Align, match the angle, pass the needle, pull through, tie, and trim.", hint: "Complete the guided phases in order; the scene responds to each phase." },
+  { id: "complete", title: "Reassess and finish", instruction: "Inspect approximation, confirm safety, and complete the scenario.", hint: "Finish only after the knot is secure and the suture is trimmed." },
 ] as const;
+
+export const stitchActions = ["Position instrument", "Match angle", "Begin stitch", "Pull suture", "Tie knot", "Cut suture"] as const;
+
+export const stitchPhaseLabels = ["Align entry", "Set approach", "Needle passage", "Pull through", "Secure knot", "Trim tails", "Review stitch"] as const;
 
 export const checklistItems = [
   { id: "review", label: "Patient identity confirmed" },
@@ -14,6 +19,7 @@ export const checklistItems = [
   { id: "identify", label: "Correct site selected" },
   { id: "prepare", label: "Sterile preparation completed" },
   { id: "instruments", label: "Correct instrument selected" },
+  { id: "incision", label: "Incision completed" },
   { id: "safety", label: "Safety check completed" },
   { id: "complete", label: "Procedure completed" },
 ] as const;

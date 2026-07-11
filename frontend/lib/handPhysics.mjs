@@ -58,6 +58,7 @@ export function palmPose(hand, ws = WORKSPACE) {
     x: lerp(ws.x[0], ws.x[1], 1 - cx),
     y: Math.max(ws.floorY, lerp(ws.y[1], ws.y[0], cy)),
     z: lerp(ws.z[0], ws.z[1], depth),
+    screen: { x: 1 - cx * 2, y: 1 - cy * 2, depth },
     grip: hand.pinch ? 1 : 0,
     axes: { across, up, forward },
   };
