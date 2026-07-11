@@ -25,7 +25,7 @@ export const modelConfig = {
 export const MODEL_PATHS = {
   patient: "/3d/patient.glb",
   alternatePatient: "/3d/patient2.fbx",
-  handArm: "/3d/ArmsPayDayHigh.fbx",
+  hand: "/3d/hand.glb",
   hospitalBed: "/models/hospital-bed.glb",
   monitor: "/models/monitor.glb",
   needleHolder: "/3d/Instruments/NeedleHolder.glb",

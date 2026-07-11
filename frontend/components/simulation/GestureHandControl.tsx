@@ -1,15 +1,15 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal, useFrame, useLoader } from "@react-three/fiber";
+import { useFrame } from "@react-three/fiber";
+import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { FilesetResolver, GestureRecognizer } from "@mediapipe/tasks-vision";
 import { useSimulation } from "./SimulationProvider";
 import { ModelErrorBoundary, SafeMedicalGLB } from "./ModelRegistry";
 import { MODEL_PATHS } from "@/data/modelConfig";
-import { WORKSPACE, damp, fingerCurls, palmPose, springStep } from "@/lib/handPhysics.mjs";
+import { WORKSPACE, damp, palmPose, springStep } from "@/lib/handPhysics.mjs";
 
 type Landmark = { x: number; y: number; z: number };
 export type TrackedHand = {
@@ -32,10 +32,9 @@ const RELEASE_MS = 600; // sustained open palms before the tool returns to the t
 const STALE_MS = 400; // no detection for this long → hand parks by the tray
 const PINCH_RATIO = .35; // thumb→index tip distance relative to hand size
 
-// Calibration knobs for the rigged arms asset.
-const HAND_LENGTH = .56; // wrist → middle fingertip, world units
-const ARM_SHORTEN = { upper: .35, fore: .55 }; // compress the arm trailing behind the wrist
-const CURL_PER_JOINT = [.8, 1.05, .65]; // radians per knuckle at full curl
+// Calibration knob for the tracked GLB proxy.
+const HAND_LENGTH = .62;
+const FLIP_HANDEDNESS = false; // flip if the on-screen hands mirror your real ones
 const PARK: Record<Side, { x: number; y: number; z: number }> = {
   Right: { x: 2.3, y: 2.35, z: 1.5 },
   Left: { x: -2.3, y: 2.35, z: 1.5 },
@@ -197,39 +196,22 @@ const TOOL_ASSETS: Record<string, string> = {
   "Curved needle": MODEL_PATHS.curvedNeedle,
 };
 
-const FINGERS = ["Thumb", "Index", "Middle", "Ring", "Pinky"] as const;
-type FingerName = "thumb" | "index" | "middle" | "ring" | "pinky";
-const RELAXED_CURLS: Record<FingerName, number> = { thumb: .15, index: .15, middle: .15, ring: .15, pinky: .15 };
-
-type Joint = { bone: THREE.Object3D; rest: THREE.Quaternion; axis: THREE.Vector3 };
-
-const vecOf = (root: THREE.Object3D, name: string) => {
-  const bone = root.getObjectByName(name);
-  return bone ? bone.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3();
-};
-
-const basisQuat = (across: THREE.Vector3, up: THREE.Vector3, forward: THREE.Vector3) =>
-  new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(across, up, forward));
+const basisQuat = (across: THREE.Vector3, forward: THREE.Vector3, up: THREE.Vector3) =>
+  new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(across, forward, up));
 
 const scratchQuat = new THREE.Quaternion(); // reused every frame by the curl loop
 
 /** Both surgeon hands, each independently driven by its detected counterpart. */
 export function GestureHand() {
   return <>
-    <ModelErrorBoundary fallback={<group />}><Suspense fallback={<group />}><RiggedHand side="Right" /></Suspense></ModelErrorBoundary>
-    <ModelErrorBoundary fallback={<group />}><Suspense fallback={<group />}><RiggedHand side="Left" /></Suspense></ModelErrorBoundary>
+    <ModelErrorBoundary fallback={<group />}><Suspense fallback={<group />}><TrackedGLBHand side="Right" /></Suspense></ModelErrorBoundary>
+    <ModelErrorBoundary fallback={<group />}><Suspense fallback={<group />}><TrackedGLBHand side="Left" /></Suspense></ModelErrorBoundary>
   </>;
 }
 
-/**
- * One surgeon hand: MediaPipe landmarks drive the FBX skeleton directly.
- * Palm orientation comes from the landmark basis (so showing the back of the
- * hand or the palm reads correctly), each finger curls from its own landmark
- * angles, and position is spring-damped with a collision floor above the
- * patient. Parks at the bedside while its hand is not detected.
- */
-function RiggedHand({ side }: { side: Side }) {
-  const source = useLoader(FBXLoader, MODEL_PATHS.handArm);
+/** One hand from hand.glb, visible only while MediaPipe reports that side. */
+function TrackedGLBHand({ side }: { side: Side }) {
+  const { scene } = useGLTF(MODEL_PATHS.hand);
   const root = useRef<THREE.Group>(null);
   const rot = useRef<THREE.Group>(null);
   const park = PARK[side];
@@ -239,59 +221,44 @@ function RiggedHand({ side }: { side: Side }) {
     z: { value: park.z, velocity: 0 },
     grip: { value: 0, velocity: 0 },
   });
-  const curls = useRef<Record<FingerName, number>>({ ...RELAXED_CURLS });
   const { state } = useSimulation();
   const toolPath = state.selectedTool ? TOOL_ASSETS[state.selectedTool] : undefined;
 
-  const { rig, wrist, pivot, restQuatInv, fingers } = useMemo(() => {
-    const rig = cloneSkeleton(source);
-    const glove = new THREE.MeshStandardMaterial({ color: "#9fc6d8", roughness: .5, metalness: .05 });
-    rig.traverse(object => {
+  const hand = useMemo(() => {
+    const armatures = scene.children.filter(child => {
+      let skinned = false;
+      child.traverse(object => { if (object instanceof THREE.SkinnedMesh) skinned = true; });
+      return skinned;
+    }).sort((a, b) => a.position.x - b.position.x);
+    const source = (side === "Right" ? armatures[0] : armatures.at(-1)) ?? armatures[0] ?? scene.children[0];
+    if (!source) return new THREE.Group();
+    const model = cloneSkeleton(source);
+    model.position.set(0, 0, 0);
+    model.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const scale = HAND_LENGTH / (Math.max(size.x, size.y, size.z) || 1);
+    model.scale.multiplyScalar(scale);
+    model.position.copy(center).multiplyScalar(-scale);
+    model.traverse(object => {
       if (!(object instanceof THREE.Mesh)) return;
       object.castShadow = true;
-      object.frustumCulled = false; // skinned bounds don't follow the moving root
-      object.material = Array.isArray(object.material) ? object.material.map(() => glove) : glove;
+      object.receiveShadow = true;
+      object.frustumCulled = false;
     });
-    const other: Side = side === "Left" ? "Right" : "Left";
-    rig.getObjectByName(`${other}Shoulder`)?.scale.setScalar(.0001); // this instance renders one hand only
-    // compress the arm trailing behind the wrist, keeping the hand full size
-    rig.getObjectByName(`${side}Arm`)?.scale.setScalar(ARM_SHORTEN.upper);
-    rig.getObjectByName(`${side}ForeArm_`)?.scale.setScalar(ARM_SHORTEN.fore);
-    rig.getObjectByName(`${side}Hand`)?.scale.setScalar(1 / (ARM_SHORTEN.upper * ARM_SHORTEN.fore));
-    rig.updateMatrixWorld(true);
-    const wrist = rig.getObjectByName(`${side}Hand`) ?? rig;
-    const handSpan = vecOf(rig, `${side}Hand`).distanceTo(vecOf(rig, `${side}HandMiddle4`)) || 1;
-    rig.scale.setScalar(HAND_LENGTH / handSpan);
-    rig.updateMatrixWorld(true);
-
-    const wristAt = wrist.getWorldPosition(new THREE.Vector3());
-    // anatomical rest basis of this hand, from its own knuckle bones
-    const forward = vecOf(rig, `${side}HandMiddle1`).sub(wristAt).normalize();
-    const up = new THREE.Vector3().crossVectors(forward, vecOf(rig, `${side}HandIndex1`).sub(vecOf(rig, `${side}HandPinky1`)).normalize()).normalize();
-    const across = new THREE.Vector3().crossVectors(up, forward).normalize();
-    const fingers = {} as Record<FingerName, Joint[]>;
-    for (const finger of FINGERS) {
-      const joints: Joint[] = [];
-      for (let j = 1; j <= 3; j++) {
-        const bone = rig.getObjectByName(`${side}Hand${finger}${j}`);
-        if (!bone) continue;
-        const worldQuat = bone.getWorldQuaternion(new THREE.Quaternion());
-        joints.push({ bone, rest: bone.quaternion.clone(), axis: across.clone().applyQuaternion(worldQuat.invert()).normalize() });
-      }
-      fingers[finger.toLowerCase() as FingerName] = joints;
-    }
-    return { rig, wrist, pivot: wristAt.negate(), restQuatInv: basisQuat(across, up, forward).invert(), fingers };
-  }, [source, side]);
+    return model;
+  }, [scene, side]);
 
   useFrame((_, delta) => {
     const group = root.current;
     const rotGroup = rot.current;
     if (!group || !rotGroup) return;
     const fresh = performance.now() - handStore.at < STALE_MS;
-    const live = fresh ? handStore.hands.find(hand => hand.side === side) ?? null : null;
-
-    rig.position.copy(pivot);
-    const pose = live ? palmPose(live) : { ...park, grip: 0, axes: null };
+    const live = fresh ? handStore.hands.find(hand => (FLIP_HANDEDNESS ? (hand.side === "Right" ? "Left" : "Right") : hand.side) === side) ?? null : null;
+    group.visible = Boolean(live);
+    if (!live) return;
+    const pose = palmPose(live);
     const a = axes.current;
     // stiff springs: tracking is realtime now, so follow tightly and let the
     // damping kill jitter rather than adding visible lag
@@ -304,31 +271,18 @@ function RiggedHand({ side }: { side: Side }) {
     if (pose.axes) {
       const target = basisQuat(
         new THREE.Vector3(...pose.axes.across),
-        new THREE.Vector3(...pose.axes.up),
         new THREE.Vector3(...pose.axes.forward),
-      ).multiply(restQuatInv);
-      rotGroup.quaternion.slerp(target, damp(20, delta));
-    }
-
-    const liveCurls = (live ? fingerCurls(live.landmarks) : RELAXED_CURLS) as Record<FingerName, number>;
-    const blend = damp(16, delta);
-    for (const finger of Object.keys(curls.current) as FingerName[]) {
-      const level = curls.current[finger] += (liveCurls[finger] - curls.current[finger]) * blend;
-      for (let j = 0; j < 3; j++) {
-        const joint = fingers[finger]?.[j];
-        if (joint) joint.bone.quaternion.copy(joint.rest).multiply(scratchQuat.setFromAxisAngle(joint.axis, level * CURL_PER_JOINT[j]));
-      }
+        new THREE.Vector3(...pose.axes.up),
+      );
+      rotGroup.quaternion.slerp(target, damp(14, delta));
     }
   });
 
-  return <group ref={root} position={[park.x, park.y, park.z]}>
+  return <group ref={root} visible={false} position={[park.x, park.y, park.z]}>
     <group ref={rot}>
-      <primitive object={rig} />
+      <primitive object={hand} />
+      {toolPath && <GrippedTool path={toolPath} side={side} axesRef={axes} />}
     </group>
-    {toolPath && createPortal(
-      <GrippedTool path={toolPath} side={side} axesRef={axes} />,
-      wrist,
-    )}
   </group>;
 }
 
@@ -341,6 +295,6 @@ function GrippedTool({ path, side, axesRef }: { path: string; side: Side; axesRe
     if (holder.current) holder.current.visible = handStore.gripSide === side && (axesRef.current?.grip.value ?? 0) > .5;
   });
   return <group ref={holder} visible={false}>
-    <SafeMedicalGLB path={path} targetSize={22} color="#bcc8cc" metalness={.84} roughness={.2} preserveTextures={false} position={[0, 0, 6]} rotation={[Math.PI / 2, 0, 0]} fallback={<group />} />
+    <SafeMedicalGLB path={path} targetSize={.62} color="#bcc8cc" metalness={.84} roughness={.2} preserveTextures={false} position={[0, .22, .08]} rotation={[Math.PI / 2, 0, 0]} fallback={<group />} />
   </group>;
 }
