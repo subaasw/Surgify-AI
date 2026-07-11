@@ -25,6 +25,36 @@ const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const norm = v => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
 
+/** Map a screen-space pointer onto a native range and snap to its step. */
+export function rangeValueAt(clientX, left, width, min, max, step = 1) {
+  const ratio = clamp((clientX - left) / Math.max(width, 1), 0, 1);
+  const value = min + ratio * (max - min);
+  return clamp(Math.round(value / step) * step, min, max);
+}
+
+/** Relative mouse-style movement: hand deltas move a parked screen cursor. */
+export function relativeCursorAt(pointer, handAnchor, cursorAnchor, bounds, gain = 1.8) {
+  return {
+    x: clamp(cursorAnchor.x + (pointer.x - handAnchor.x) * bounds.width * gain, bounds.left, bounds.left + bounds.width),
+    y: clamp(cursorAnchor.y + (pointer.y - handAnchor.y) * bounds.height * gain, bounds.top, bounds.top + bounds.height),
+  };
+}
+
+/**
+ * Two-frame pinch debounce. Returns a new tiny state object and emits only on
+ * stable edges, so holding a pinch cannot repeatedly activate a control.
+ */
+export function stablePinch(state, pinching, stableFrames = 2) {
+  const frames = pinching === state.candidate ? Math.min(state.frames + 1, stableFrames) : 1;
+  if (frames < stableFrames || pinching === state.active) {
+    return { state: { ...state, candidate: pinching, frames }, event: null };
+  }
+  return {
+    state: { active: pinching, candidate: pinching, frames },
+    event: pinching ? "press" : "release",
+  };
+}
+
 // camera space (x right, y down, z away from camera) → POV world space.
 // The webcam watches your hands from the front; the sim shows them from
 // behind, exactly like your own eyes — a 180° turn about the vertical axis

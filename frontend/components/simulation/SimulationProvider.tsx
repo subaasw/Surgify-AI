@@ -243,7 +243,11 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     setSutureAngle: angle => setState(current => ({ ...current, sutureAngle: angle })),
     setIncisionProgress: progress => setState(current => ({ ...current, incisionProgress: Math.min(1, Math.max(0, progress)) })),
     setStitchProgress: progress => setState(current => ({ ...current, stitchProgress: Math.min(1, Math.max(0, progress)) })),
-    resetSimulation: () => setState(createInitialState()),
+    resetSimulation: () => setState(current => ({
+      ...createInitialState(),
+      trackingOverlay: current.trackingOverlay,
+      uiCollapsed: current.trackingOverlay,
+    })),
     toggleAnatomy: () => setState(current => ({ ...current, anatomyOverlay: !current.anatomyOverlay, cameraMode: !current.anatomyOverlay ? "anatomy" : "patient" })),
     toggleTracking: () => setState(current => ({ ...current, trackingOverlay: !current.trackingOverlay })),
     setUiCollapsed: (collapsed) => setState(current => ({ ...current, uiCollapsed: collapsed })),

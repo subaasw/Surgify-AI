@@ -293,3 +293,19 @@ html[data-contrast="true"] .simulation-page{--muted:#405d73;--border:rgba(31,78,
 
 @media(max-width:900px){.simulation-app .settings-app-grid{grid-template-columns:1fr}.simulation-app .settings-app-grid aside{display:grid;grid-template-columns:1fr 1fr}.simulation-app .settings-app-grid aside>div:first-child{grid-row:span 2}.simulation-app .scenario-result-summary{grid-template-columns:120px 1fr}.simulation-app .result-stat-stack{grid-column:1/-1;height:auto;padding:14px 0 0;border-left:0;border-top:1px solid rgba(225,244,255,.14);display:grid;grid-template-columns:repeat(3,1fr)}}
 @media(max-width:760px){.simulation-app .app-rail{inset:8px auto 8px 8px;width:52px;padding-inline:5px}.simulation-app .simulation-main{margin-left:68px}.simulation-app .app-page::before{left:68px}.simulation-app .app-page-header{top:8px;height:64px;margin:0 8px;padding:0 14px}.simulation-app .app-page-content{height:calc(100vh - 80px);padding:24px 8px 12px}.simulation-app .settings-app-grid aside{display:flex}.simulation-app .result-footer-actions,.simulation-app .result-footer-actions>div{flex-wrap:wrap;gap:8px}}
+
+/* Hands-only mode: camera-aligned landmarks and a contextual liquid-glass HUD. */
+.simulation-app .simulation-viewport>.gesture-camera.pip{z-index:55}
+.simulation-app .simulation-viewport>.gesture-camera.full{z-index:5}
+.simulation-app .simulation-viewport>.gesture-screen-cursor{z-index:500}
+.simulation-app .gesture-camera{border-color:rgba(190,232,255,.32);background:rgba(5,20,32,.72);box-shadow:inset 0 1px rgba(255,255,255,.14),0 22px 48px rgba(2,10,18,.38);backdrop-filter:blur(22px) saturate(135%)}
+.simulation-app .hand-control-mode .objective-hud{top:18px}
+.simulation-app .hand-control-mode .viewport-bottom-status{display:none}
+.simulation-app .hand-control-mode .gesture-camera.pip{top:92px;right:18px;width:270px}
+.simulation-app .hand-control-mode.briefing-open .simulation-viewport>.gesture-camera.pip{position:fixed;z-index:300;top:24px;right:24px;width:250px}
+.simulation-app .incision-track:has(input.hand-hover),.simulation-app .position-track:has(input.hand-hover){border-color:#78dfff;box-shadow:0 0 0 4px rgba(78,185,225,.16)}
+.simulation-app .incision-track>b,.simulation-app .position-track>b{background:linear-gradient(145deg,#258ed0,#1d6ca5);box-shadow:0 7px 18px rgba(4,75,127,.35)}
+@media(max-width:900px){.simulation-app .hand-control-mode .gesture-camera.pip{width:220px;top:84px}.gesture-screen-cursor>span{display:none}}
+.simulation-app .exit-confirmation{position:fixed;z-index:400;inset:0;display:grid;place-items:center;background:rgba(2,11,20,.52);backdrop-filter:blur(12px)}
+.simulation-app .exit-confirmation>section{width:min(390px,calc(100% - 32px));padding:24px;text-align:center;color:var(--sim-copy);background:var(--sim-glass);border:1px solid var(--sim-line);border-radius:20px;box-shadow:inset 0 1px rgba(255,255,255,.14),0 28px 70px rgba(2,10,18,.42);backdrop-filter:blur(26px)}
+.simulation-app .exit-confirmation>section>svg{color:#ffafb3}.simulation-app .exit-confirmation strong{display:block;font-size:1rem;margin:9px 0 4px}.simulation-app .exit-confirmation p{margin:0;color:var(--sim-muted);font-size:.68rem}.simulation-app .exit-confirmation section>div{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:20px}.simulation-app .exit-confirmation button{height:42px;border:1px solid rgba(218,241,255,.2);border-radius:11px;background:rgba(218,241,255,.08);color:#e4f2fa;cursor:pointer}.simulation-app .exit-confirmation button.danger{border-color:rgba(255,148,153,.35);background:rgba(192,53,62,.24);color:#ffc3c6}

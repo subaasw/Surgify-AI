@@ -7,8 +7,10 @@ import * as THREE from "three";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { FilesetResolver, GestureRecognizer } from "@mediapipe/tasks-vision";
 import { ModelErrorBoundary } from "./ModelRegistry";
+import { useSimulation } from "./SimulationProvider";
 import { MODEL_PATHS } from "@/data/modelConfig";
-import { LandmarkFilter, WORKSPACE, classifyPose, damp, fingerDirs, palmPose, springStep } from "@/lib/handPhysics.mjs";
+import { procedureSteps } from "@/data/simulationData";
+import { LandmarkFilter, WORKSPACE, classifyPose, damp, fingerDirs, palmPose, rangeValueAt, relativeCursorAt, springStep, stablePinch } from "@/lib/handPhysics.mjs";
 
 type Landmark = { x: number; y: number; z: number };
 export type TrackedHand = {
@@ -63,6 +65,28 @@ const HAND_CONNECTIONS = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7]
 const SIDE_COLORS: Record<Side, string> = { Right: "#5fd4de", Left: "#f0c25e" };
 
 type TrackingPhase = "starting" | "denied" | "offline" | "calibrating" | "active";
+type PinchState = { active: boolean; candidate: boolean; frames: number };
+
+const CONTROL_SELECTOR = 'button:not(:disabled),a[href],input[type="range"],[role="button"]:not([aria-disabled="true"])';
+
+function controlLabel(target: HTMLElement | null) {
+  if (!target) return "";
+  return (target.getAttribute("aria-label") || target.getAttribute("title") || target.textContent || "Control")
+    .replace(/\s+/g, " ").trim().slice(0, 56);
+}
+
+function setRangeFromPointer(input: HTMLInputElement, clientX: number) {
+  const rect = input.getBoundingClientRect();
+  const min = Number(input.min || 0);
+  const max = Number(input.max || 100);
+  const step = input.step === "any" ? (max - min) / 100 : Number(input.step || 1);
+  const value = rangeValueAt(clientX, rect.left, rect.width, min, max, step);
+  if (Math.abs(Number(input.value) - value) < step / 2) return;
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  setter?.call(input, String(value));
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
 
 /**
  * DOM side of gesture control: runs MediaPipe gesture recognition directly in
@@ -73,18 +97,31 @@ type TrackingPhase = "starting" | "denied" | "offline" | "calibrating" | "active
  * Renders the picture-in-picture camera panel; keep it outside the r3f Canvas.
  */
 export function HandTrackingDriver() {
+  const { state } = useSimulation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
+  const cursorRef = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<TrackingPhase>("starting");
   const [gesture, setGesture] = useState("No hands");
+  const [targetLabel, setTargetLabel] = useState("");
+  const objective = procedureSteps[state.currentStep];
 
   useEffect(() => {
+    const cursorNode = cursorRef.current;
     let stopped = false;
     let stream: MediaStream | null = null;
     let recognizer: GestureRecognizer | null = null;
     let rafId = 0;
     let lastVideoTime = -1;
     let lastNow = 0;
+    let hovered: HTMLElement | null = null;
+    let draggedRange: HTMLInputElement | null = null;
+    let confirmPinch: PinchState = { active: false, candidate: false, frames: 0 };
+    let cursorPosition: { x: number; y: number } | null = null;
+    let moveActive = false;
+    let handAnchor = { x: 0, y: 0 };
+    let cursorAnchor = { x: 0, y: 0 };
+    let publishedTarget = "";
     const calSizes: number[] = [];
     const filters: Record<Side, { image: LandmarkFilter; world: LandmarkFilter }> = {
       Right: { image: new LandmarkFilter(FILTER_CUTOFF, FILTER_BETA), world: new LandmarkFilter(FILTER_CUTOFF, FILTER_BETA) },
@@ -101,18 +138,89 @@ export function HandTrackingDriver() {
         const px = (i: number) => (1 - hand.landmarks[i].x) * overlay.width; // mirror to match the selfie video
         const py = (i: number) => hand.landmarks[i].y * overlay.height;
         context.strokeStyle = color;
-        context.lineWidth = 1.4;
+        context.lineWidth = 2.6;
         context.beginPath();
         for (const [a, b] of HAND_CONNECTIONS) { context.moveTo(px(a), py(a)); context.lineTo(px(b), py(b)); }
         context.stroke();
         context.fillStyle = color;
-        for (let i = 0; i < hand.landmarks.length; i++) { context.beginPath(); context.arc(px(i), py(i), 1.7, 0, Math.PI * 2); context.fill(); }
-        if (hand.pinch) { context.strokeStyle = "#63e08d"; context.lineWidth = 2; context.beginPath(); context.arc((px(4) + px(8)) / 2, (py(4) + py(8)) / 2, 7, 0, Math.PI * 2); context.stroke(); }
-        context.font = "600 9px system-ui";
+        for (let i = 0; i < hand.landmarks.length; i++) { context.beginPath(); context.arc(px(i), py(i), 3, 0, Math.PI * 2); context.fill(); }
+        if (hand.pinch) { context.strokeStyle = "#63e08d"; context.lineWidth = 3; context.beginPath(); context.arc((px(4) + px(8)) / 2, (py(4) + py(8)) / 2, 12, 0, Math.PI * 2); context.stroke(); }
+        context.font = "600 14px system-ui";
         context.fillStyle = "#eafcff";
         const label = `${hand.side} · ${hand.pinch ? "Pinch" : hand.gesture?.replace(/_/g, " ") || "Hand"}`;
         context.fillText(label, Math.min(px(0), overlay.width - context.measureText(label).width - 3), Math.min(py(0) + 12, overlay.height - 4));
       }
+    };
+
+    const publishTarget = (label: string) => {
+      if (label === publishedTarget) return;
+      publishedTarget = label;
+      setTargetLabel(label);
+    };
+
+    const clearHandControl = () => {
+      hovered?.classList.remove("hand-hover");
+      hovered = null;
+      draggedRange = null;
+      confirmPinch = { active: false, candidate: false, frames: 0 };
+      cursorPosition = null;
+      moveActive = false;
+      publishTarget("");
+      if (cursorNode) cursorNode.hidden = true;
+    };
+
+    const updateHandControl = (hands: TrackedHand[]) => {
+      const leftHand = hands.find(item => item.side === "Left");
+      const rightHand = hands.find(item => item.side === "Right");
+      const cursor = cursorRef.current;
+      const root = document.querySelector<HTMLElement>(".simulation-page");
+      if (!cursor || !root) { clearHandControl(); return; }
+
+      const bounds = root.getBoundingClientRect();
+      if (leftHand?.pinch) {
+        if (!moveActive) {
+          moveActive = true;
+          handAnchor = { ...leftHand.pointer };
+          cursorPosition ??= { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
+          cursorAnchor = { ...cursorPosition };
+        }
+        cursorPosition = relativeCursorAt(leftHand.pointer, handAnchor, cursorAnchor, bounds);
+      } else moveActive = false;
+      const transition = stablePinch(confirmPinch, Boolean(rightHand?.pinch));
+      confirmPinch = transition.state;
+      if (!cursorPosition) {
+        cursor.hidden = true;
+        if (transition.event === "release") draggedRange = null;
+        return;
+      }
+      const { x: clientX, y: clientY } = cursorPosition;
+      cursor.hidden = false;
+      cursor.style.left = `${clientX}px`;
+      cursor.style.top = `${clientY}px`;
+      cursor.classList.toggle("moving", Boolean(leftHand?.pinch));
+      cursor.classList.toggle("pinching", Boolean(rightHand?.pinch));
+
+      const raw = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+      let target = raw?.closest<HTMLElement>(CONTROL_SELECTOR) ?? null;
+      if (target && !root.contains(target)) target = null;
+      if (draggedRange && confirmPinch.active) target = draggedRange;
+      if (target !== hovered) {
+        hovered?.classList.remove("hand-hover");
+        hovered = target;
+        hovered?.classList.add("hand-hover");
+      }
+      publishTarget(controlLabel(target));
+
+      if (transition.event === "press" && target) {
+        if (target instanceof HTMLInputElement && target.type === "range") {
+          draggedRange = target;
+          setRangeFromPointer(target, clientX);
+        } else {
+          target.click();
+        }
+      }
+      if (confirmPinch.active && draggedRange) setRangeFromPointer(draggedRange, clientX);
+      if (transition.event === "release") draggedRange = null;
     };
 
     const tick = () => {
@@ -123,6 +231,11 @@ export function HandTrackingDriver() {
       const now = performance.now();
       const dt = lastNow ? (now - lastNow) / 1000 : 0;
       lastNow = now;
+      const overlay = overlayRef.current;
+      if (overlay && video.videoWidth && (overlay.width !== video.videoWidth || overlay.height !== video.videoHeight)) {
+        overlay.width = video.videoWidth;
+        overlay.height = video.videoHeight;
+      }
       const result = recognizer.recognizeForVideo(video, now);
 
       const detected = assignSides(result.landmarks.slice(0, 2).map((landmarks, i) => ({
@@ -167,11 +280,13 @@ export function HandTrackingDriver() {
         } else {
           setGesture(`${Math.round(calSizes.length / CALIBRATION_FRAMES * 100)}%`);
         }
+        clearHandControl();
         return; // hands stay parked until calibrated
       }
 
       handStore.hands = hands;
       handStore.at = now;
+      updateHandControl(hands);
       setGesture(hands.length
         ? hands.map(hand => `${hand.side[0]}·${hand.pinch ? "Pinch" : hand.gesture?.replace(/_/g, " ") || "Hand"}`).join("  ")
         : "No hands");
@@ -183,6 +298,7 @@ export function HandTrackingDriver() {
           video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
           audio: false,
         });
+        if (stopped) { stream.getTracks().forEach(track => track.stop()); return; }
       } catch {
         if (!stopped) setPhase("denied");
         return;
@@ -213,6 +329,9 @@ export function HandTrackingDriver() {
       stream?.getTracks().forEach(track => track.stop());
       recognizer?.close();
       handStore.hands = [];
+      handStore.at = 0;
+      hovered?.classList.remove("hand-hover");
+      if (cursorNode) cursorNode.hidden = true;
     };
   }, []);
 
@@ -221,13 +340,23 @@ export function HandTrackingDriver() {
     : phase === "offline" ? "Tracking failed to load"
     : phase === "calibrating" ? "Show an open palm ✋"
     : "Hand tracking";
-  return <div className={`gesture-pip${phase === "active" || phase === "calibrating" ? "" : " offline"}`}>
-    <div className="gesture-pip-feed">
+  const fullCamera = state.cameraMode === "webcam";
+  const active = phase === "active" || phase === "calibrating";
+  return <>
+    <div className={`gesture-camera ${fullCamera ? "full" : "pip"}${active ? "" : " offline"}`}>
+      <div className="gesture-camera-feed">
       <video ref={videoRef} muted playsInline />
-      <canvas ref={overlayRef} width={204} height={153} />
+        <canvas ref={overlayRef} width={640} height={480} />
+        <div className="gesture-camera-live"><i /><span>{label}</span></div>
+        <div className="gesture-camera-hud">
+          <small>Stage {state.currentStep + 1} · {objective.title}</small>
+          <strong>{phase === "active" ? targetLabel ? `Right pinch · ${targetLabel}` : "Left pinch moves · Right pinch selects" : label}</strong>
+          {active && <span>{gesture}</span>}
+        </div>
+      </div>
     </div>
-    <div><i /><span>{label}</span>{(phase === "active" || phase === "calibrating") && <strong>{gesture}</strong>}</div>
-  </div>;
+    <div ref={cursorRef} className="gesture-screen-cursor" hidden aria-hidden="true"><i /><span>{targetLabel || "Left pinch to move"}</span></div>
+  </>;
 }
 
 const FINGER_NAMES = ["thumb", "index", "middle", "ring", "pinky"] as const;

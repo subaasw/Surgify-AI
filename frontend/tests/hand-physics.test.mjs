@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { WORKSPACE, damp, fingerCurls, fingerDirs, palmPose, springStep } from "../lib/handPhysics.mjs";
+import { WORKSPACE, damp, fingerCurls, fingerDirs, palmPose, rangeValueAt, relativeCursorAt, springStep, stablePinch } from "../lib/handPhysics.mjs";
 
 // flat hand facing the camera: wrist below knuckles, index left of pinky (right hand)
 function flatHand(over = {}) {
@@ -146,4 +146,33 @@ test("one-euro filter kills jitter at rest but follows fast motion", async () =>
   let followed = 0;
   for (let i = 0; i < 30; i++) followed = moving.next(i * .02, 1 / 60); // fast sweep
   assert.ok(Math.abs(followed - 29 * .02) < .05, `fast motion should track closely, got ${followed} vs ${29 * .02}`);
+});
+
+test("rangeValueAt clamps and snaps hand-driven ranges", () => {
+  assert.equal(rangeValueAt(50, 0, 100, 0, 1, .01), .5);
+  assert.equal(rangeValueAt(-20, 0, 100, 30, 85, 1), 30);
+  assert.equal(rangeValueAt(130, 0, 100, 30, 85, 1), 85);
+  assert.equal(rangeValueAt(46, 0, 100, 0, 10, 2), 4);
+});
+
+test("relative cursor stays parked on re-pinch and moves by hand delta", () => {
+  const bounds = { left: 0, top: 0, width: 1000, height: 500 };
+  const parked = { x: 600, y: 250 };
+  assert.deepEqual(relativeCursorAt({ x: .2, y: .3 }, { x: .2, y: .3 }, parked, bounds), parked);
+  assert.deepEqual(relativeCursorAt({ x: .3, y: .4 }, { x: .2, y: .3 }, parked, bounds, 1), { x: 700, y: 300 });
+  assert.deepEqual(relativeCursorAt({ x: 2, y: -2 }, { x: 0, y: 0 }, parked, bounds), { x: 1000, y: 0 });
+});
+
+test("stablePinch emits one press and one release per stable gesture", () => {
+  let state = { active: false, candidate: false, frames: 0 };
+  let next = stablePinch(state, true);
+  assert.equal(next.event, null);
+  next = stablePinch(next.state, true);
+  assert.equal(next.event, "press");
+  next = stablePinch(next.state, true);
+  assert.equal(next.event, null, "holding must not repeat the press");
+  next = stablePinch(next.state, false);
+  assert.equal(next.event, null);
+  next = stablePinch(next.state, false);
+  assert.equal(next.event, "release");
 });
