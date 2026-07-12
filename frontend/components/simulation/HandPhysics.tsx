@@ -44,6 +44,13 @@ const TOOL_CONFIG: Record<PhysicalTool, {
   "Surgical scissors": { spawn: [3.3, 1.18, -.62], tip: [0, 0, -.3], grip: [0, 0, .08], rotation: TOOL_ASSETS["Surgical scissors"].rotation, size: .62 },
 };
 
+const TOOLS = Object.keys(TOOL_CONFIG) as PhysicalTool[];
+const HOVER_RANGE = .58; // reach within which a hand highlights + can grab the nearest tool
+const HELD_SCALE = .6; // shrink the tool once held so it fits inside the pinch
+const RELEASE_GRACE = .3; // seconds of un-pinch before a held tool drops — rides out tracking jitter
+/** The tool each hand would grab on pinch (nearest in reach) — drives highlight AND grab. */
+export const grabTarget: Record<Side, PhysicalTool | null> = { Right: null, Left: null };
+
 const PARKED = { x: 0, y: -20, z: 0 };
 const DYNAMIC = 0;
 const KINEMATIC_POSITION = 2;
@@ -51,7 +58,6 @@ const targetPosition = new THREE.Vector3();
 const targetRotation = new THREE.Quaternion();
 const gripOffset = new THREE.Vector3();
 const tipOffset = new THREE.Vector3();
-const bodyPosition = new THREE.Vector3();
 const localTip = new THREE.Vector3();
 const localNeedle = new THREE.Vector3();
 const localForceps = new THREE.Vector3();
@@ -62,6 +68,7 @@ export function SurgicalPhysics({ active }: { active: boolean }) {
   if (!active) return null;
   return <Suspense fallback={null}>
     <DirectSurgeryController />
+    <GrabHighlights />
     <Physics colliders={false} timeStep="vary">
       <CuboidCollider args={[.68, .03, .38]} position={[2.8, 1.05, -.62]} friction={.9} />
       <CuboidCollider args={[1.15, .28, 2.4]} position={[0, 1.45, 0]} friction={.9} />
@@ -74,7 +81,7 @@ export function SurgicalPhysics({ active }: { active: boolean }) {
       <CuboidCollider args={[3.6, .2, 4]} position={[0, 4.6, 0]} />
       <PinchBody side="Right" />
       <PinchBody side="Left" />
-      {(Object.keys(TOOL_CONFIG) as PhysicalTool[]).map(tool => <PhysicalInstrument key={tool} tool={tool} />)}
+      {TOOLS.map(tool => <PhysicalInstrument key={tool} tool={tool} />)}
     </Physics>
   </Suspense>;
 }
@@ -102,11 +109,54 @@ function PinchBody({ side }: { side: Side }) {
   </RigidBody>;
 }
 
+/** Flat pulsing rings that light up the nearest grabbable tool a hovering hand would pick up. */
+function GrabHighlights() {
+  const rings = useRef(new Map<PhysicalTool, THREE.Mesh>());
+  useFrame((frame) => {
+    for (const side of ["Right", "Left"] as const) {
+      const hand = handWorld[side];
+      if (!hand.live || hand.holding || interactionState.menuOpen) { grabTarget[side] = null; continue; }
+      let best: PhysicalTool | null = null;
+      let bestDist = HOVER_RANGE;
+      for (const tool of TOOLS) {
+        const pose = toolWorld[tool];
+        if (!pose.live || pose.holder) continue;
+        const dist = hand.pinchPoint.distanceTo(pose.position);
+        if (dist < bestDist) { bestDist = dist; best = tool; }
+      }
+      grabTarget[side] = best;
+    }
+    const pulse = .5 + .3 * Math.sin(frame.clock.elapsedTime * 6);
+    for (const tool of TOOLS) {
+      const ring = rings.current.get(tool);
+      if (!ring) continue;
+      const mat = ring.material as THREE.MeshBasicMaterial;
+      const target = grabTarget.Right === tool || grabTarget.Left === tool ? pulse : 0;
+      mat.opacity += (target - mat.opacity) * .3;
+      ring.visible = mat.opacity > .02;
+      if (ring.visible) {
+        const p = toolWorld[tool].position;
+        ring.position.set(p.x, p.y - .04, p.z);
+      }
+    }
+  });
+  return <>
+    {TOOLS.map(tool => (
+      <mesh key={tool} ref={m => { if (m) rings.current.set(tool, m); }} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
+        <ringGeometry args={[.13, .18, 40]} />
+        <meshBasicMaterial color="#3fe0ff" transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
+    ))}
+  </>;
+}
+
 function PhysicalInstrument({ tool }: { tool: PhysicalTool }) {
   const { state, grabTool, releaseHeldTool } = useSimulation();
   const body = useRef<RapierRigidBody>(null);
+  const visual = useRef<THREE.Group>(null);
   const holder = useRef<Side | null>(null);
   const wasPinch = useRef<Record<Side, boolean>>({ Right: false, Left: false });
+  const releaseTimer = useRef(0);
   const config = TOOL_CONFIG[tool];
   const gripRotation = useMemo(() => new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0)), []);
 
@@ -128,7 +178,7 @@ function PhysicalInstrument({ tool }: { tool: PhysicalTool }) {
     toolWorld[tool].holder = null;
   }, [releaseHeldTool, tool]);
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const rigid = body.current;
     if (!rigid) return;
     const required = requiredSurgeryTools(state.currentStep, state.stitchPhase);
@@ -138,23 +188,25 @@ function PhysicalInstrument({ tool }: { tool: PhysicalTool }) {
       const pinching = hand.live && hand.pinch;
       const pinchStarted = pinching && !wasPinch.current[side];
       wasPinch.current[side] = pinching;
-      if (!holder.current && pinchStarted && !hand.holding && !interactionState.menuOpen) {
-        bodyPosition.set(rigid.translation().x, rigid.translation().y, rigid.translation().z);
-        const distance = hand.pinchPoint.distanceTo(bodyPosition);
-        const nearest = (Object.keys(TOOL_CONFIG) as PhysicalTool[]).every(other => other === tool || !toolWorld[other].live || distance <= hand.pinchPoint.distanceTo(toolWorld[other].position) + .001);
-        if (distance <= .34 && nearest) {
-          holder.current = side;
-          hand.holding = true;
-          rigid.setBodyType(KINEMATIC_POSITION, true);
-          grabTool(side, tool);
-        }
+      if (!holder.current && pinchStarted && !hand.holding && !interactionState.menuOpen && grabTarget[side] === tool) {
+        holder.current = side;
+        hand.holding = true;
+        grabTarget[side] = null;
+        releaseTimer.current = 0;
+        rigid.setBodyType(KINEMATIC_POSITION, true);
+        grabTool(side, tool);
+        if (typeof navigator !== "undefined") navigator.vibrate?.(35); // haptic pulse on pickup
       }
       if (holder.current !== side) continue;
       const operativeHold = state.currentStep >= 5 && required.includes(tool);
       if (!hand.live) continue;
-      if (!pinching && !operativeHold) {
-        returnToTray(side, rigid);
+      if (pinching || operativeHold) {
+        releaseTimer.current = 0;
       } else {
+        releaseTimer.current += delta;
+        if (releaseTimer.current > RELEASE_GRACE) { returnToTray(side, rigid); continue; }
+      }
+      {
         targetRotation.copy(hand.quaternion).multiply(gripRotation);
         gripOffset.set(...config.grip).applyQuaternion(targetRotation);
         targetPosition.copy(hand.pinchPoint).add(gripOffset);
@@ -188,11 +240,18 @@ function PhysicalInstrument({ tool }: { tool: PhysicalTool }) {
     }
     runtime.holder = holder.current;
     runtime.live = true;
+    if (visual.current) {
+      const goal = holder.current ? HELD_SCALE : 1;
+      const cur = visual.current.scale.x;
+      visual.current.scale.setScalar(cur + (goal - cur) * Math.min(1, delta * 12));
+    }
   });
 
   return <RigidBody ref={body} position={config.spawn} colliders={false} ccd linearDamping={1.2} angularDamping={1.6}>
     <CuboidCollider args={[.055, .045, .27]} friction={.85} restitution={0} />
-    {tool === "Scalpel" ? <ProceduralScalpel /> : <SafeMedicalGLB path={TOOL_ASSETS[tool].path} targetSize={config.size} color="#bdc8cc" metalness={.84} roughness={.2} preserveTextures={false} rotation={config.rotation} fallback={<group />} />}
+    <group ref={visual}>
+      {tool === "Scalpel" ? <ProceduralScalpel /> : <SafeMedicalGLB path={TOOL_ASSETS[tool].path} targetSize={config.size} color="#bdc8cc" metalness={.84} roughness={.2} preserveTextures={false} rotation={config.rotation} fallback={<group />} />}
+    </group>
   </RigidBody>;
 }
 

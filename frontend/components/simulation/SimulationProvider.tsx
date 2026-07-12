@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { usePathname } from "next/navigation";
 import type { CameraMode, CoachMessage, SimulationState } from "@/types/simulation";
 import { procedureSteps, stitchActions } from "@/data/simulationData";
-import { INCISION_SEGMENTS } from "@/lib/handPhysics.mjs";
+import { INCISION_SEGMENTS, postureFeedbackAt } from "@/lib/handPhysics.mjs";
 
 const createInitialState = (): SimulationState => ({
   runStatus: "ready",
@@ -217,6 +217,16 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     }), 1000);
     return () => clearInterval(timer);
   }, [pathname, state.runStatus, state.paused]);
+
+  useEffect(() => {
+    if (pathname !== "/simulation" || state.runStatus !== "active" || state.paused || !state.trackingOverlay) return;
+    const timer = window.setInterval(() => setState(current => {
+      if (current.runStatus !== "active" || !current.trackingOverlay) return current;
+      const feedback = postureFeedbackAt(Math.random());
+      return addFeedback(current, feedback.title, feedback.message, feedback.tone);
+    }), 15_000);
+    return () => window.clearInterval(timer);
+  }, [pathname, state.runStatus, state.paused, state.trackingOverlay]);
 
   useEffect(() => {
     if (pathname !== "/simulation" || state.runStatus !== "active" || state.paused) return;

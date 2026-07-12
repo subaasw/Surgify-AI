@@ -82,6 +82,13 @@ export function isSurfaceMesh(object) {
   return Boolean(object?.isMesh && !object?.isLine2 && !object?.isLineSegments2);
 }
 
+/** Demo-only posture feedback until tracked stability drives this directly. */
+export function postureFeedbackAt(sample) {
+  return sample < .5
+    ? { title: "Hand stability warning", message: "Your hand appears unstable. Slow down and keep your wrist neutral.", tone: "warning" }
+    : { title: "Good hand posture", message: "Your wrist position and hand posture look controlled. Maintain this approach.", tone: "success" };
+}
+
 export const INCISION_SEGMENTS = 4;
 
 /** Return the guide segment touched by a real tool tip, or -1 off-surface. */

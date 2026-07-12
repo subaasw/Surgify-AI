@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { WORKSPACE, damp, fingerCurls, fingerDirs, guidedCameraMode, handProjectionDistance, incisionSegmentAt, insideSurgeryWindow, isSurfaceMesh, palmPose, patientSurfaceYAt, rangeValueAt, rayPlaneDistance, relativeCursorAt, requiredSurgeryTools, springStep, stablePinch } from "../lib/handPhysics.mjs";
+import { WORKSPACE, damp, fingerCurls, fingerDirs, guidedCameraMode, handProjectionDistance, incisionSegmentAt, insideSurgeryWindow, isSurfaceMesh, palmPose, patientSurfaceYAt, postureFeedbackAt, rangeValueAt, rayPlaneDistance, relativeCursorAt, requiredSurgeryTools, springStep, stablePinch } from "../lib/handPhysics.mjs";
 
 // flat hand facing the camera: wrist below knuckles, index left of pinky (right hand)
 function flatHand(over = {}) {
@@ -224,4 +224,9 @@ test("surface raycasts ignore Drei line helpers", () => {
   assert.equal(isSurfaceMesh({ isMesh: true }), true);
   assert.equal(isSurfaceMesh({ isMesh: true, isLine2: true }), false);
   assert.equal(isSurfaceMesh({ isMesh: true, isLineSegments2: true }), false);
+});
+
+test("demo posture feedback covers warning and positive states", () => {
+  assert.equal(postureFeedbackAt(.1).tone, "warning");
+  assert.equal(postureFeedbackAt(.9).tone, "success");
 });
