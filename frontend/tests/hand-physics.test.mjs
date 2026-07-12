@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { WORKSPACE, damp, fingerCurls, fingerDirs, guidedCameraMode, handProjectionDistance, incisionSegmentAt, insideSurgeryWindow, palmPose, patientSurfaceYAt, rangeValueAt, rayPlaneDistance, relativeCursorAt, requiredSurgeryTools, springStep, stablePinch } from "../lib/handPhysics.mjs";
+import { WORKSPACE, damp, fingerCurls, fingerDirs, guidedCameraMode, handProjectionDistance, incisionSegmentAt, insideSurgeryWindow, isSurfaceMesh, palmPose, patientSurfaceYAt, rangeValueAt, rayPlaneDistance, relativeCursorAt, requiredSurgeryTools, springStep, stablePinch } from "../lib/handPhysics.mjs";
 
 // flat hand facing the camera: wrist below knuckles, index left of pinky (right hand)
 function flatHand(over = {}) {
@@ -218,4 +218,10 @@ test("tray projection intersects the instrument surface in front of the camera",
 test("procedure close-up uses a near hand workspace instead of room depth", () => {
   assert.ok(handProjectionDistance("closeup", .5) < 1.1);
   assert.ok(handProjectionDistance("room", .5) > 4);
+});
+
+test("surface raycasts ignore Drei line helpers", () => {
+  assert.equal(isSurfaceMesh({ isMesh: true }), true);
+  assert.equal(isSurfaceMesh({ isMesh: true, isLine2: true }), false);
+  assert.equal(isSurfaceMesh({ isMesh: true, isLineSegments2: true }), false);
 });

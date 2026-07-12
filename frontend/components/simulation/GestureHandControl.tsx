@@ -11,7 +11,7 @@ import { useSimulation } from "./SimulationProvider";
 import { MODEL_PATHS } from "@/data/modelConfig";
 import { procedureSteps } from "@/data/simulationData";
 import type { CameraMode } from "@/types/simulation";
-import { LandmarkFilter, WORKSPACE, classifyPose, damp, fingerDirs, handProjectionDistance, palmPose, rangeValueAt, rayPlaneDistance, relativeCursorAt, sceneSurfaceYAt, springStep, stablePinch } from "@/lib/handPhysics.mjs";
+import { LandmarkFilter, WORKSPACE, classifyPose, damp, fingerDirs, handProjectionDistance, isSurfaceMesh, palmPose, rangeValueAt, rayPlaneDistance, relativeCursorAt, sceneSurfaceYAt, springStep, stablePinch } from "@/lib/handPhysics.mjs";
 import { MotionTracker, motionStats } from "@/lib/handMetrics.mjs";
 
 type Landmark = { x: number; y: number; z: number };
@@ -102,6 +102,7 @@ export const collisionMeshes: THREE.Object3D[] = [];
 const surfaceRay = new THREE.Raycaster();
 const rayFrom = new THREE.Vector3();
 const RAY_DOWN = new THREE.Vector3(0, -1, 0);
+const surfaceTargets: THREE.Object3D[] = [];
 
 /** True surface height under (x,z): the real patient mesh via raycast, else the analytic bed/tray/floor. */
 function surfaceUnder(x: number, z: number) {
@@ -109,7 +110,9 @@ function surfaceUnder(x: number, z: number) {
   if (collisionMeshes.length) {
     rayFrom.set(x, 5, z);
     surfaceRay.set(rayFrom, RAY_DOWN);
-    const hit = surfaceRay.intersectObjects(collisionMeshes, true)[0];
+    surfaceTargets.length = 0;
+    for (const root of collisionMeshes) root.traverse(object => { if (isSurfaceMesh(object)) surfaceTargets.push(object); });
+    const hit = surfaceRay.intersectObjects(surfaceTargets, false)[0];
     if (hit) y = Math.max(y, hit.point.y);
   }
   return y;

@@ -116,7 +116,7 @@ function demoAdvanceStep(current: SimulationState): SimulationState {
   if (current.currentStep === 6) next = { ...next, stitchPhase: stitchActions.length, stitchProgress: 1, suturePosition: 50, sutureAngle: 52, completedActions: [...new Set([...next.completedActions, ...stitchActions])] };
   if (current.currentStep === 7) next.completedActions = addAction(addAction(next.completedActions, "safety"), "Finish procedure");
   const advanced = completeCurrentStep(next, step.id, "Demo assist: stage advanced after the 10-second limit.");
-  return current.currentStep === 7 ? { ...advanced, runStatus: "complete", paused: false } : advanced;
+  return current.currentStep === 7 ? { ...advanced, runStatus: "complete", paused: false, trackingOverlay: false } : advanced;
 }
 
 function selectToolState(current: SimulationState, tool: string): SimulationState {
@@ -140,6 +140,11 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SimulationState>(createInitialState);
   const pathname = usePathname();
   const processingId = useRef<string | null>(null);
+  const cameraOnRef = useRef(false);
+  const heartbeatRef = useRef<HTMLAudioElement | null>(null);
+  const scoreSpokenRef = useRef(false);
+
+  useEffect(() => { cameraOnRef.current = state.trackingOverlay; }, [state.trackingOverlay]);
 
   useEffect(() => {
     try {
@@ -166,7 +171,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
           ...current,
           feedback: current.feedback.map(f => f.id === latest.id ? { ...f, message: data.ai_message || originalMessage } : f)
         }));
-        if (data.audio_data) {
+        if (data.audio_data && cameraOnRef.current) {
           new Audio(data.audio_data).play().catch(console.error);
         }
       })
@@ -178,6 +183,31 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
         }));
       });
   }, [state.feedback, state.score]);
+
+  useEffect(() => {
+    heartbeatRef.current ??= new Audio("/audio/steadyheart.mp3");
+    const audio = heartbeatRef.current;
+    audio.loop = true;
+    audio.volume = .25;
+    if (pathname === "/simulation" && state.trackingOverlay && state.runStatus === "active") audio.play().catch(() => {});
+    else { audio.pause(); audio.currentTime = 0; }
+    return () => audio.pause();
+  }, [pathname, state.trackingOverlay, state.runStatus]);
+
+  useEffect(() => {
+    if (state.runStatus === "ready") { scoreSpokenRef.current = false; return; }
+    if (state.runStatus !== "complete" || state.trackingOverlay || scoreSpokenRef.current) return;
+    scoreSpokenRef.current = true;
+    let cancelled = false;
+    fetch("http://localhost:8000/api/v1/coach/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: `Simulation complete. Final score: ${state.score} out of 100.`, metrics: { score: state.score } }),
+    }).then(response => response.json()).then(data => {
+      if (!cancelled && data.audio_data) new Audio(data.audio_data).play().catch(() => {});
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [state.runStatus, state.trackingOverlay, state.score]);
 
   useEffect(() => {
     if (pathname !== "/simulation" || state.runStatus !== "active" || state.paused) return;
@@ -194,7 +224,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     const timer = window.setTimeout(() => setState(current => {
       if (current.currentStep !== step || current.runStatus !== "active") return current;
       return demoAdvanceStep(current);
-    }), 10_000);
+    }), state.currentStep === 5 ? 20_000 : 10_000);
     return () => window.clearTimeout(timer);
   }, [pathname, state.currentStep, state.runStatus, state.paused]);
 
@@ -305,7 +335,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     if (action === "Finish procedure") {
       if (current.currentStep !== 7 || !current.completedSteps.includes("suture")) return addFeedback(current, "Procedure not ready to finish", "Complete the guided nerve repair before final reassessment.", "error", -3);
       const completed = completeCurrentStep({ ...current, completedActions: addAction(addAction(current.completedActions, "safety"), action) }, "complete", "Final site and safety reassessment completed.");
-      const finished = { ...completed, runStatus: "complete" as const, paused: false };
+      const finished = { ...completed, runStatus: "complete" as const, paused: false, trackingOverlay: false };
       try { localStorage.setItem("surgify:simulation-result", JSON.stringify({ score: finished.score, elapsedTime: finished.elapsedTime, completedSteps: finished.completedSteps, completedActions: finished.completedActions, events: finished.events, suturePosition: finished.suturePosition, sutureAngle: finished.sutureAngle, completedAt: new Date().toISOString() })); } catch { /* local persistence is optional */ }
       return finished;
     }

@@ -77,6 +77,11 @@ export function handProjectionDistance(mode, depth) {
   return mode === "closeup" ? lerp(.78, 1.25, reach) : lerp(2.6, 5.8, reach);
 }
 
+/** Exclude Drei Line2 helpers from camera-less physics raycasts. */
+export function isSurfaceMesh(object) {
+  return Boolean(object?.isMesh && !object?.isLine2 && !object?.isLineSegments2);
+}
+
 export const INCISION_SEGMENTS = 4;
 
 /** Return the guide segment touched by a real tool tip, or -1 off-surface. */
